@@ -68,6 +68,7 @@ private:
     static void TrackGorilla(std::shared_ptr<Gorilla> G, std::int32_t Index);
     static std::shared_ptr<Gorilla> GetGorilla(std::int32_t Index);
     static std::shared_ptr<Gorilla> GetGorilla(Gorilla& G);
+    static std::shared_ptr<Gorilla> GetGorilla(Internal::NPC& N);
 
     inline static std::shared_mutex PlayersLock;
     inline static std::map<std::int32_t, std::shared_ptr<TrackedPlayer>> TrackedPlayers;
@@ -85,7 +86,7 @@ private:
 
     struct PendingAttack
     {
-        std::int32_t GorillaIndex = -1;
+        Internal::NPC Gorilla = Internal::NPC(nullptr);
         Internal::Player Target = Internal::Player(nullptr);
         std::int32_t AttackStyle = 0;
         std::int32_t FinishTick = 0;

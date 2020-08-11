@@ -28,6 +28,7 @@ void PaintMethod()
 {
     Paint::Clear();
     GameListener::DrawGorillas();
+    GameListener::DrawProjectiles();
     Paint::SwapBuffer();
 }
 
@@ -59,7 +60,7 @@ bool OnStart()
 bool Loop()
 {
     GameListener::Instance().Start();
-    Wait(5000);
+    Wait(1000);
     return true;
 
     if (Mainscreen::IsLoggedIn())

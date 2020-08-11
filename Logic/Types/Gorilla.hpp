@@ -83,7 +83,7 @@ public:
     std::atomic<std::int32_t> NextAttackTick = -100;
     std::atomic<std::int32_t> AttacksUntilSwitch = Globals::Gorillas::ATTACKS_PER_SWITCH;
     std::atomic<std::int32_t> DisabledMeleeMovementTicks = 0;
-    std::atomic<std::int32_t> NextPossibleAttackStyles = 0;
+    std::atomic<std::int32_t> NextPossibleAttackStyles = MELEE_FLAG | RANGED_FLAG | MAGIC_FLAG;
 
     std::atomic<bool> InitiatedCombat = false;
     std::atomic<bool> RecentlyTookDamage = false;

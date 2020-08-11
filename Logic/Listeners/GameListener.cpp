@@ -18,7 +18,7 @@ void GameListener::DrawGorillas()
         if (!G) continue;
         Point Next = Internal::TileToMainscreen(G->GetTile(), 0, 0, 0);
 
-        Paint::DrawString(std::to_string(G->AttacksUntilSwitch), Next, 0, 255, 0, 255); Next.Y += 20;
+        Paint::DrawString(std::to_string(G->GetIndex()) + " | " + std::to_string(G->AttacksUntilSwitch), Next, 0, 255, 0, 255); Next.Y += 20;
 
         if (G->NextPossibleAttackStyles & Gorilla::MELEE_FLAG)
         {
@@ -45,6 +45,19 @@ void GameListener::DrawGorillas()
         }
     }
 }
+
+void GameListener::DrawPlayers()
+{
+
+}
+
+void GameListener::DrawProjectiles()
+{
+    std::shared_lock Lock(GorillasLock);
+    for (const auto& P : GameListener::TrackedProjectiles)
+        if (P.Interacting()) Paint::DrawTile( Interactable::Player((Internal::Player) P.GetInteracting()).GetTile(), 0, 255, 255, 255);
+}
+
 
 bool GameListener::IsGorilla(std::int32_t ID)
 {
@@ -395,13 +408,24 @@ void GameListener::CheckGorillaAttacks()
 
                 if (PredictedNewArea)
                 {
-                    std::int32_t Distance = Gorilla->GetLastWorldArea()->DistanceTo(*Target->GetLastWorldArea());
+                    //std::int32_t Distance = Gorilla->GetLastWorldArea()->DistanceTo(*Target->GetLastWorldArea());
+                    std::int32_t Distance = Gorilla->GetWorldArea().DistanceTo(*Target->GetLastWorldArea());
                     if (Distance <= Globals::Gorillas::MAX_ATTACK_RANGE && Target->GetLastWorldArea()->HasLineOfSightTo(*Gorilla->GetLastWorldArea()))
                     {
                         const auto PredictedTile = PredictedNewArea.AsTile();
-                        if (std::floor(PredictedTile.DistanceFrom(Gorilla->GetLastWorldArea()->AsTile())) != 0.00)
+/*                      const auto LastWorldAreaTile = Gorilla->GetLastWorldArea()->AsTile();
+
+                        auto DistAB = PredictedTile.DistanceFrom(LastWorldAreaTile);
+                        auto DistRL = std::max(std::abs(PredictedTile.X - LastWorldAreaTile.X), std::abs(PredictedTile.Y - LastWorldAreaTile.Y));
+
+                        DebugLog("LastWorldArea > {} > DistAB: {} -> {} | DistRL: {} -> {}", Gorilla->GetIndex(), DistAB, (std::int32_t) DistAB, DistRL, (std::int32_t) DistRL);*/
+                        if ((std::int32_t) PredictedTile.DistanceFrom(Gorilla->GetLastWorldArea()->AsTile()) != 0)
                         {
-                            if (std::floor(PredictedTile.DistanceFrom(Gorilla->GetTrueLocation())) == 0.00)
+/*                            const auto TrueLoc = Gorilla->GetTrueLocation();
+                            DistAB = std::floor(PredictedTile.DistanceFrom(TrueLoc));
+                            DistRL = std::max(std::abs(PredictedTile.X - TrueLoc.X), std::abs(PredictedTile.Y - TrueLoc.Y));
+                            DebugLog("TrueLoc > {} > DistAB: {} -> {} | DistRL: {} -> {}", Gorilla->GetIndex(), DistAB, (std::int32_t) DistAB, DistRL, (std::int32_t) DistRL);*/
+                            if ((std::int32_t) PredictedTile.DistanceFrom(Gorilla->GetTrueLocation()) == 0)
                             {
                                 // Turn off all but MELEE
                                 Gorilla->NextPossibleAttackStyles &= ~Gorilla::RANGED_FLAG;
@@ -409,8 +433,9 @@ void GameListener::CheckGorillaAttacks()
                                 Gorilla->NextPossibleAttackStyles &= ~Gorilla::BOULDER_FLAG;
                             } else
                                 Gorilla->NextPossibleAttackStyles &= ~Gorilla::MELEE_FLAG;
-                        } else if (TickCount >= Gorilla->NextAttackTick && Gorilla->LastProjectileID == -1
-                                   && !GameListener::AnyBoulderOn(Target->GetLastWorldArea()->AsTile()))
+                        } else if (TickCount >= Gorilla->NextAttackTick
+                                    && Gorilla->LastProjectileID == -1
+                                    && !GameListener::AnyBoulderOn(Target->GetLastWorldArea()->AsTile()))
                         {
                             // Turn off all but MELEE
                             Gorilla->NextPossibleAttackStyles &= ~Gorilla::RANGED_FLAG;
@@ -467,12 +492,12 @@ void GameListener::ProcessPendingAttacks()
         if (TickCount >= Iterator->FinishTick)
         {
             bool DecreaseCounter = false;
-            auto Gorilla = GameListener::GetGorilla(Iterator->GorillaIndex);
+            auto Gorilla = GameListener::GetGorilla(Iterator->Gorilla);
             auto Target = GameListener::GetPlayer(Iterator->Target);
 
             if (!Target || !*Target) // Player went out of memory, so assume the hit was a 0
                 DecreaseCounter = true;
-            else if (Target->HasRecentHitsplats())
+            else if (!Target->HasRecentHitsplats())
             {
                 // No hitsplats was applied. This may happen in some cases
                 // where the player was out of memory while the
@@ -503,9 +528,7 @@ void GameListener::UpdateTrackedPlayers()
     {
         if (!Player) continue;
         auto Area = std::make_shared<WorldArea>(WorldArea(*Player));
-        assert(Area);
         Player->SetLastWorldArea(std::move(Area));
-        assert(!Area);
         Player->ClearRecentHitsplats();
     }
     PlayersLock.unlock();
@@ -620,7 +643,7 @@ void GameListener::OnGorillaAttack(std::shared_ptr<Gorilla> G, std::int32_t Atta
         }
     }
 
-    bool CorrectPrayer = !Target || (AttackStyle & ProtectedStyle);
+    bool CorrectPrayer = !Target || ProtectedStyle == AttackStyle;
     if (AttackStyle == Gorilla::BOULDER_FLAG)
     {
         // The gorilla can't throw boulders when it's meleeing
@@ -654,7 +677,7 @@ void GameListener::OnGorillaAttack(std::shared_ptr<Gorilla> G, std::int32_t Atta
                     DamageTick += (Distance + Globals::Gorillas::PROJECTILE_RANGED_DELAY) / Globals::Gorillas::PROJECTILE_RANGED_SPEED;
                 }
             }
-            GameListener::AddPendingAttack(PendingAttack { G->GetIndex(), Target, AttackStyle, DamageTick });
+            GameListener::AddPendingAttack(PendingAttack { *G, Target, AttackStyle, DamageTick });
         }
 
         if (AttackStyle != Gorilla::MELEE_FLAG)     G->NextPossibleAttackStyles &= ~Gorilla::MELEE_FLAG;
@@ -732,7 +755,7 @@ void GameListener::OnHitsplat(const std::shared_ptr<TrackedPlayer>& P, Hitsplat&
 
 void GameListener::OnProjectile(Interactable::Projectile& P)
 {
-    DebugLog("[GameListener] > Spawned > {} | {} ", P.GetID(), P.GetEndTick());
+    DebugLog("[GameListener] > Spawned > {} | {}", P.GetID(), P.GetEndTick());
 
     if (P.GetID() == Globals::Gorillas::PROJECTILE_BOULDER)
     {
@@ -746,9 +769,22 @@ void GameListener::OnProjectile(Interactable::Projectile& P)
         {
             if (!G) continue;
 
-            if (P.GetTile() == G->GetTile())
+            const auto ProjTile = P.GetTile();
+            const auto GTile = G->GetTile();
+            const auto TrueGTile = G->GetTrueLocation();
+
+            std::int32_t DistG = ProjTile.DistanceFrom(GTile);
+            std::int32_t DistTrueG = ProjTile.DistanceFrom(TrueGTile);
+
+            bool Matches = false;
+            if (DistG == 0 || DistTrueG == 0 || P.Interacting() && P.Interacting(G->GetInteracting()))
+            {
                 G->LastProjectileID = P.GetID();
-            // TODO add a warning here
+                Matches = true;
+            }
+
+            //DebugLog("Tiles > {}, {} | {}, {} - {}, {} > {}", ProjTile.X, ProjTile.Y, GTile.X, GTile.Y, TrueGTile.X, TrueGTile.Y, Matches);
+            DebugLog("Tiles > {}, {} > {}", DistG, DistTrueG, Matches);
         }
         GorillasLock.unlock();
     }
@@ -777,6 +813,15 @@ std::shared_ptr<Gorilla> GameListener::GetGorilla(Gorilla& G)
     std::shared_lock Lock(GorillasLock);
     for (auto& Gorilla : GameListener::TrackedGorillas)
         if (*Gorilla.second == G)
+            return Gorilla.second;
+    return std::shared_ptr<Gorilla>();
+}
+
+std::shared_ptr<Gorilla> GameListener::GetGorilla(Internal::NPC& N)
+{
+    std::shared_lock Lock(GorillasLock);
+    for (auto& Gorilla : GameListener::TrackedGorillas)
+        if (*Gorilla.second == N)
             return Gorilla.second;
     return std::shared_ptr<Gorilla>();
 }
@@ -847,9 +892,7 @@ bool GameListener::AnyBoulderOn(const Tile& T)
     std::lock_guard<std::mutex> Lock(BouldersLock);
     auto Find = [&T](const Tile& P) -> bool { return T == P; };
     auto P = std::find_if(GameListener::RecentBoulderLocations.begin(), GameListener::RecentBoulderLocations.end(), Find);
-    if (P != GameListener::RecentBoulderLocations.end())
-        return true;
-    return false;
+    return P != GameListener::RecentBoulderLocations.end();
 }
 
 void GameListener::AddPendingAttack(const GameListener::PendingAttack& P)

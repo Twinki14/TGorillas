@@ -1,4 +1,5 @@
 #include "GameListener.hpp"
+#include "../Gorillas.hpp"
 #include <Core/Internal.hpp>
 #include <TScript.hpp>
 #include <functional>
@@ -293,7 +294,17 @@ void GameListener::CheckCurrentGorilla()
     auto Player = GameListener::GetPlayer(GameListener::LocalPlayerIndex);
     if (!Player || !*Player) return;
 
+    std::int32_t ProtectedStyle = 0;
+    const auto ProtectionIcon = Player->GetOverheadIcon();
+    const auto EquippedStyle = Gorillas::GetEquippedStyle();
     const auto PlayerLoc = Player->GetTrueLocation();
+    switch (ProtectionIcon)
+    {
+        case Globals::ICON_MELEE:   ProtectedStyle = Gorilla::MELEE_FLAG; break;
+        case Globals::ICON_RANGED:  ProtectedStyle = Gorilla::RANGED_FLAG; break;
+        case Globals::ICON_MAGIC:   ProtectedStyle = Gorilla::MAGIC_FLAG; break;
+        default: break;
+    }
 
 /*    if (GameListener::CurrentGorilla && *GameListener::CurrentGorilla)
     {
@@ -350,11 +361,47 @@ void GameListener::CheckCurrentGorilla()
         if (New && *New)
         {
             std::int32_t Distance = Gorilla->GetTrueLocation().DistanceFrom(PlayerLoc);
-            if (Distance < New->GetTrueLocation().DistanceFrom(PlayerLoc))
+            std::int32_t NewDistance = New->GetTrueLocation().DistanceFrom(PlayerLoc);
+            if (Distance <= 6)
             {
-                //DebugLog("Set because closer");
-                New = Gorilla;
+                if (Gorilla->GetProtectionStyle() != EquippedStyle)
+                {
+                    if (New->GetProtectionStyle() != EquippedStyle)
+                    {
+                        if (Distance < NewDistance)
+                        {
+                            New = Gorilla;
+                            continue;
+                        }
+                    } else
+                    {
+                        New = Gorilla;
+                        continue;
+                    }
+                }
+
+                if (ProtectedStyle != 0)
+                {
+                    if (Gorilla->NextPossibleAttackStyles & ProtectedStyle)
+                    {
+                        if (New->NextPossibleAttackStyles & ProtectedStyle)
+                        {
+                            if (Distance < NewDistance)
+                            {
+                                New = Gorilla;
+                                continue;
+                            }
+                        } else
+                        {
+                            New = Gorilla;
+                            continue;
+                        }
+                    }
+                }
             }
+
+            if (Distance < NewDistance)
+                New = Gorilla;
         } else
         {
             //DebugLog("Set because null");

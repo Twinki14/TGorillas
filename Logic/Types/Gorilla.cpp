@@ -23,19 +23,15 @@ std::int32_t Gorilla::GetOverheadIcon() const
 
 std::int32_t Gorilla::GetProtectionStyle() const
 {
+    enum STYLE { MELEE_PRAYER, RANGED_PRAYER, MAGIC_PRAYER };
     switch (this->GetInfo().GetOverheadPrayer())
     {
-        case MELEE:     return Gorilla::MELEE;
-        case RANGED:    return Gorilla::RANGED;
-        case MAGIC:     return Gorilla::MAGIC;
+        case MELEE_PRAYER:     return Gorilla::MELEE_FLAG;
+        case RANGED_PRAYER:    return Gorilla::RANGED_FLAG;
+        case MAGIC_PRAYER:     return Gorilla::MAGIC_FLAG;
         default: break;
     }
     return -1;
-}
-
-std::vector<Gorilla::STYLE> Gorilla::GetPredictedStyles() const
-{
-    return std::vector<STYLE>();
 }
 
 Internal::Player Gorilla::GetInteractingPlayer() const

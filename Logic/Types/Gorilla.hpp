@@ -57,8 +57,6 @@ public:
     Gorilla();
     explicit Gorilla(Interactable::NPC& N, std::int32_t Index);
 
-    enum STYLE { MELEE, RANGED, MAGIC };
-
     enum STYLE_FLAGS
     {
         MELEE_FLAG      = 1 << 0,
@@ -70,7 +68,6 @@ public:
     std::int32_t GetIndex() const;
     std::int32_t GetOverheadIcon() const;
     std::int32_t GetProtectionStyle() const;
-    std::vector<STYLE> GetPredictedStyles() const;
     Internal::Player GetInteractingPlayer() const;
     Tile GetTrueLocation() const;
     WorldArea GetWorldArea() const;

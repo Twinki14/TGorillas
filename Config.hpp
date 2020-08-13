@@ -38,6 +38,12 @@ public:
             { "UseHotkeys_Esc", true },
             { "UseHotkeys_Gametabs", true },
 
+            { "GearSet_Melee_Names", configuru::Config::array(std::vector<std::string>(11, "")) },
+            { "GearSet_Melee_IDs", configuru::Config::array(std::vector<std::int32_t>(11, -1)) },
+
+            { "GearSet_Ranged_Names", configuru::Config::array(std::vector<std::string>(11, "")) },
+            { "GearSet_Ranged_IDs", configuru::Config::array(std::vector<std::int32_t>(11, -1)) },
+
             { "UseRunePouch", false },
             { "SpecialWeapon", INVALID },
             { "StatRefreshMethod", CLAN_WARS },
@@ -50,7 +56,7 @@ public:
 
             { "UseHighAlchemy", false },
             { "Loot_MinimumHighAlchemyProfit", 0 },
-            { "Loot_Blacklist", configuru::Config::array({ }) },
+            { "Loot_Blacklist", configuru::Config::array(std::vector<std::int32_t>()) },
 
             { "Debug_Paint", false },
             { "Debug_Logging", true },
@@ -61,9 +67,10 @@ public:
     static configuru::Config& Get(const std::string& Key);
     static void Set(const std::string& Key, const configuru::Config& Conf);
 
+    static void SetGearsets();
+    static void SetAntiban();
     inline static std::vector<std::string> AntibanTasks;
     inline static std::vector<std::string> AFKTasks;
-    static void SetAntiban();
 
     inline static const std::string GotifyHost = "twinki.ddns.net";
     inline static const std::string GotifyAuthPluginToken = "PzPu8plcKnRd37S";

@@ -7,6 +7,7 @@
 
 #define CONFIGURU_IMPLEMENTATION 1
 #include <Tools/configuru.hpp>
+#include <Utilities/GearSets.hpp>
 
 void Config::RequestArgs()
 {
@@ -45,9 +46,9 @@ void Config::LoadArgs(const std::string& FileName)
                     case configuru::Config::Array:
                     {
                         configuru::FormatOptions Options = configuru::make_json_options();
-                        Options.array_trailing_comma = true;
                         Options.end_with_newline = false;
-                        const auto Conf = configuru::parse_string(Arg.c_str(), Options, Key.c_str());
+                        Options.indentation = "";
+                        auto Conf = configuru::parse_string(Arg.c_str(), Options, Key.c_str());
                         Config::Cfg[Key] = Conf.as_array();
                     }
                     default: break;
@@ -105,9 +106,9 @@ void Config::SaveArgs(const std::string& FileName)
             case configuru::Config::Array:
             {
                 configuru::FormatOptions Options = configuru::make_json_options();
-                Options.array_trailing_comma = true;
                 Options.end_with_newline = false;
-                Value = configuru::dump_string(O.value(), Options);
+                Options.indentation = "";
+                Value = configuru::dump_string(O.value().as_array(), Options);
                 break;
             }
             default: break;
@@ -129,6 +130,54 @@ void Config::Set(const std::string& Key, const configuru::Config& Conf)
 {
     const std::lock_guard<std::mutex> Lock(Config::CfgAccessLock);
     Config::Cfg[Key] = Conf;
+}
+
+void Config::SetGearsets()
+{
+    GearSet Melee;
+    GearSet Ranged;
+    GearSet Special;
+
+    bool CfgHasMelee = Config::Cfg.count("GearSet_Melee_Names")
+                       && Config::Cfg.count("GearSet_Melee_IDs")
+                       && Config::Cfg["GearSet_Melee_Names"].array_size() == 11
+                       && Config::Cfg["GearSet_Melee_IDs"].array_size() == 11;
+
+    bool CfgHasRanged= Config::Cfg.count("GearSet_Ranged_Names")
+                       && Config::Cfg.count("GearSet_Ranged_IDs")
+                       && Config::Cfg["GearSet_Ranged_Names"].array_size() == 11
+                       && Config::Cfg["GearSet_Ranged_IDs"].array_size() == 11;
+
+    for (std::uint32_t I = Equipment::HEAD; I <= Equipment::AMMO; I++)
+    {
+        if (CfgHasMelee) Melee.Items[I] = GearSet::Item(Config::Cfg["GearSet_Melee_Names"][I], Config::Cfg["GearSet_Melee_IDs"][I]);
+        if (CfgHasRanged) Ranged.Items[I] = GearSet::Item(Config::Cfg["GearSet_Ranged_Names"][I], Config::Cfg["GearSet_Ranged_IDs"][I]);
+    }
+
+    if (Config::Cfg.count("SpecialWeapon"))
+    {
+        switch (Config::Cfg["SpecialWeapon"].as_integer<int>())
+        {
+            case TOXIC_BLOWPIPE:
+            {
+                Special = Ranged;
+                Special.Items[Equipment::WEAPON] = GearSet::Item("Toxic blowpipe", 12926);
+                break;
+            }
+
+            case SARADOMIN_GODSWORD:
+            {
+                Special = Melee;
+                Special.Items[Equipment::WEAPON] = GearSet::Item("Saradomin godsword", 11806);
+                break;
+            }
+            default: break;
+        }
+    }
+
+    GearSets::Sets["Melee"] = std::move(Melee);
+    GearSets::Sets["Ranged"] = std::move(Ranged);
+    GearSets::Sets["Special"] = std::move(Special);
 }
 
 void Config::SetAntiban()

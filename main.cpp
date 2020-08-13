@@ -4,6 +4,8 @@
 #include <Utilities/BackgroundTask/CameraTask.hpp>
 #include <Utilities/BackgroundTask/AuthenticateTask.hpp>
 #include <Utilities/Mainscreen.hpp>
+#include <Utilities/GearSets.hpp>
+#include <bitset>
 #include "Config.hpp"
 #include "GUI/GUI.hpp"
 #include "Logic/Gorillas.hpp"
@@ -43,6 +45,7 @@ bool OnStart()
     {
         DebugLog("Trying to load args from default.json");
         Config::LoadArgs("default.json");
+        Config::SetGearsets();
     }
 
     SetLoopDelay(0);
@@ -50,6 +53,7 @@ bool OnStart()
     //if (GUI::Init())
     {
         Config::SaveArgs("default.json");
+        Config::SetGearsets();
         Config::SetAntiban();
         Script::Start(PaintMethod, true);
         return true;

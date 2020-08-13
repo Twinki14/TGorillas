@@ -35,12 +35,17 @@ private:
     static void CheckPlayers();
     static void CheckHitsplats();
     static void CheckProjectiles();
+    static void CheckCurrentGorilla();
 
     static void CheckGorillaAttackStyleSwitch(std::shared_ptr<Gorilla> G, std::int32_t ProtectedAttackStyleFlags);
 
     static void CheckGorillaAttacks();
     static void ProcessPendingAttacks();
     static void UpdateTrackedPlayers();
+
+    static void ClearPlayers();
+    static void ClearProjectiles();
+    static void ClearPendingAttacks();
     static void ClearRecentBoulders();
 
     void OnStart() override;
@@ -62,6 +67,8 @@ private:
     inline static std::atomic<std::int64_t> LastTickTime = 0;
     inline static std::atomic<std::int32_t> LastNPCUpdateTick = -1;
     inline static std::atomic<std::int32_t> LastPlayerUpdateTick = -1;
+    inline static std::atomic<std::int32_t> LocalPlayerIndex = -1;
+    inline static std::shared_ptr<Gorilla> CurrentGorilla;
 
     inline static std::shared_mutex GorillasLock;
     inline static std::map<std::int32_t, std::shared_ptr<Gorilla>> TrackedGorillas;
@@ -74,7 +81,7 @@ private:
     inline static std::map<std::int32_t, std::shared_ptr<TrackedPlayer>> TrackedPlayers;
     static void TrackPlayer(std::shared_ptr<TrackedPlayer> P, std::int32_t Index);
     static std::shared_ptr<TrackedPlayer> GetPlayer(std::int32_t Index);
-    static std::shared_ptr<TrackedPlayer> GetPlayer(Internal::Player& P);
+    static std::shared_ptr<TrackedPlayer> GetPlayer(const Internal::Player& P);
 
     inline static std::mutex ProjectilesLock;
     inline static std::mutex BouldersLock;

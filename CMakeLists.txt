@@ -14,7 +14,7 @@ file(GLOB           LIB_MISC_SOURCES    RELATIVE ${CMAKE_SOURCE_DIR} "Libs/*.hpp
 file(GLOB           GUI_SOURCES         RELATIVE ${CMAKE_SOURCE_DIR} "GUI/*.hpp" "GUI/*.cpp")
 
 message("---------")
-foreach(S IN LISTS LOGIC_SOURCES UTILITY_SOURCES GUI_SOURCES LIB_MISC_SOURCES SDL_SOURCES IMGUI_SOURCES)
+foreach(S IN LISTS GUI_SOURCES LOGIC_SOURCES UTILITY_SOURCES LIB_MISC_SOURCES SDL_SOURCES IMGUI_SOURCES)
     message("${S}")
 endforeach()
 message("---------")
@@ -26,6 +26,24 @@ set(SOURCE_FILES
         Config.hpp
         GUI/GUI.cpp
         GUI/GUI.hpp
+        Logic/Gorillas.cpp
+        Logic/Gorillas.hpp
+        Logic/Listeners/GameListener.cpp
+        Logic/Listeners/GameListener.hpp
+        Logic/Listeners/ListenerTask.cpp
+        Logic/Listeners/ListenerTask.hpp
+        Logic/Supplies.cpp
+        Logic/Supplies.hpp
+        Logic/Travel.cpp
+        Logic/Travel.hpp
+        Logic/Types/Gorilla.cpp
+        Logic/Types/Gorilla.hpp
+        Logic/Types/Hitsplat.cpp
+        Logic/Types/Hitsplat.hpp
+        Logic/Types/TrackedPlayer.cpp
+        Logic/Types/TrackedPlayer.hpp
+        Logic/Types/WorldArea.cpp
+        Logic/Types/WorldArea.hpp
         Libs/ScriptGUI.cpp
         Libs/ScriptGUI.hpp
         Libs/SDL2/include/SDL2/SDL.h
@@ -119,7 +137,7 @@ set(SOURCE_FILES
         Libs/imgui/imgui_widgets.cpp
         Libs/imgui/imstb_rectpack.h
         Libs/imgui/imstb_textedit.h
-        Libs/imgui/imstb_truetype.h Logic/GorillaOld.cpp Logic/GorillaOld.hpp Logic/Gorillas.cpp Logic/Gorillas.hpp Logic/Listeners/ListenerTask.cpp Logic/Listeners/ListenerTask.hpp Logic/Types/Gorilla.cpp Logic/Types/Gorilla.hpp Logic/Supplies.cpp Logic/Supplies.hpp Logic/Travel.cpp Logic/Travel.hpp Logic/Listeners/GameListener.cpp Logic/Listeners/GameListener.hpp Logic/Types/TrackedPlayer.cpp Logic/Types/TrackedPlayer.hpp Logic/Types/Hitsplat.cpp Logic/Types/Hitsplat.hpp Logic/Types/WorldArea.cpp Logic/Types/WorldArea.hpp)
+        Libs/imgui/imstb_truetype.h)
 
 # Set directories
 set(ALPACABOT_DIRECTORY $ENV{HOMEDRIVE}$ENV{HOMEPATH}\\AlpacaBot)

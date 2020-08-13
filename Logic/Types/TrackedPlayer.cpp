@@ -44,6 +44,26 @@ WorldArea TrackedPlayer::GetWorldArea() const
     return WorldArea(*this);
 }
 
+Tile TrackedPlayer::GetTrueLocation() const
+{
+    const auto PathX = this->GetPathX();
+    const auto PathY = this->GetPathY();
+    if (PathX.empty() || PathY.empty()) return Tile();
+
+    const auto ClientX = Internal::GetClientX();
+    const auto ClientY = Internal::GetClientY();
+    const auto ClientPlane = Internal::GetClientPlane();
+    if (ClientX < 0 || (ClientX >= 65536) || ClientY < 0 || (ClientY >= 65536))
+        return Tile(-1, -1, -1);
+
+    return Tile(ClientX + PathX[0], ClientY + PathY[0], ClientPlane);
+}
+
+bool TrackedPlayer::HealthBarShowing() const
+{
+    return Internal::GetHealthPercentage(*this) != -1.00;
+}
+
 bool TrackedPlayer::HasRecentHitsplats()
 {
     std::shared_lock Lock(HitsplatsLock);

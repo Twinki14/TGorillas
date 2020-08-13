@@ -8,19 +8,7 @@
 
 namespace Gorillas
 {
-    bool IsGorilla(std::int32_t ID);
-
-
-
-
-
-
-
-
     std::int32_t GetCurrentlyEquippedStyle();
-
-    void DrawGorilla();
-    void AccessGorilla();
 }
 
 #endif // GORILLAS_HPP_INCLUDED

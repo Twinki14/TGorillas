@@ -18,12 +18,12 @@ public:
     std::shared_ptr<Hitsplat> GetLastHitsplat() const;
     std::shared_ptr<WorldArea> GetLastWorldArea() const;
     WorldArea GetWorldArea() const;
+    Tile GetTrueLocation() const;
 
+    bool HealthBarShowing() const;
     bool HasRecentHitsplats();
     bool BlockedRecentHitsplat();
     void ClearRecentHitsplats();
-
-
 
     std::int32_t GetIndex() const;
 

@@ -28,6 +28,7 @@ void PaintMethod()
 {
     Paint::Clear();
     GameListener::DrawGorillas();
+    GameListener::DrawPlayers();
     GameListener::DrawProjectiles();
     Paint::SwapBuffer();
 }

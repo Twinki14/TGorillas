@@ -38,7 +38,7 @@ std::vector<Gorilla::STYLE> Gorilla::GetPredictedStyles() const
     return std::vector<STYLE>();
 }
 
-Interactable::Player Gorilla::GetTarget() const
+Internal::Player Gorilla::GetInteractingPlayer() const
 {
     return (Internal::Player) this->GetInteracting();
 }
@@ -61,6 +61,16 @@ Tile Gorilla::GetTrueLocation() const
 WorldArea Gorilla::GetWorldArea() const
 {
     return WorldArea(*this);
+}
+
+bool Gorilla::IsDead() const
+{
+    return this->LastHealthPercentage == 0.00 || Internal::GetHealthPercentage(*this) == 0.00 || this->GetAnimationID() == Globals::Gorillas::ANIMATION_DYING;
+}
+
+bool Gorilla::HealthBarShowing() const
+{
+    return Internal::GetHealthPercentage(*this) != -1.00;
 }
 
 void Gorilla::SetLastWorldArea(std::shared_ptr<WorldArea> Area)

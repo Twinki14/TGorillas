@@ -71,9 +71,11 @@ public:
     std::int32_t GetOverheadIcon() const;
     std::int32_t GetProtectionStyle() const;
     std::vector<STYLE> GetPredictedStyles() const;
-    Interactable::Player GetTarget() const;
+    Internal::Player GetInteractingPlayer() const;
     Tile GetTrueLocation() const;
     WorldArea GetWorldArea() const;
+    bool IsDead() const;
+    bool HealthBarShowing() const;
 
     void SetLastWorldArea(std::shared_ptr<WorldArea> Area);
     std::shared_ptr<WorldArea> GetLastWorldArea() const;
@@ -96,6 +98,7 @@ public:
     std::atomic<std::int32_t> LastTickInteractingIndex = -1;
     std::atomic<std::int32_t> LastHitsplatEndTick = -1;
     std::atomic<std::int32_t> LastProjectileID = -1;
+    std::atomic<double> LastHealthPercentage = -1.00;
 
     void Draw() const;
 

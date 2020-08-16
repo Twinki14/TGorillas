@@ -71,6 +71,7 @@ public:
     Internal::Player GetInteractingPlayer() const;
     Tile GetTrueLocation() const;
     WorldArea GetWorldArea() const;
+    WorldArea GetNextTravelingPoint(const WorldArea& TargetArea, const std::vector<WorldArea>& Gorillas, const std::vector<WorldArea>& Players) const;
     bool IsDead() const;
     bool HealthBarShowing() const;
 
@@ -97,7 +98,7 @@ public:
     std::atomic<std::int32_t> LastProjectileID = -1;
     std::atomic<double> LastHealthPercentage = -1.00;
 
-    void Draw() const;
+    void Draw(bool Emphasize = false, const WorldArea& NextTravelingPoint = WorldArea()) const;
 
 private:
     std::int32_t Index = -1;

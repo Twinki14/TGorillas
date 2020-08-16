@@ -48,7 +48,7 @@ bool OnStart()
         Config::SetGearsets();
     }
 
-    SetLoopDelay(0);
+    SetLoopDelay(50);
 
     //if (GUI::Init())
     {
@@ -65,7 +65,6 @@ bool OnStart()
 bool Loop()
 {
     GameListener::Instance().Start();
-    Wait(1000);
     return true;
 
     if (Mainscreen::IsLoggedIn())

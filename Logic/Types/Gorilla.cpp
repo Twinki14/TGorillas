@@ -1,5 +1,6 @@
 #include <Game/Core.hpp>
 #include "Gorilla.hpp"
+#include "../Listeners/GameListener.hpp"
 
 Gorilla::Gorilla() : Interactable::NPC(nullptr)
 {
@@ -59,6 +60,34 @@ WorldArea Gorilla::GetWorldArea() const
     return WorldArea(*this);
 }
 
+WorldArea Gorilla::GetNextTravelingPoint(const WorldArea& TargetArea, const std::vector<WorldArea>& Gorillas, const std::vector<WorldArea>& Players) const
+{
+    if (!this->LastWorldArea) return WorldArea();
+
+    std::function<bool(const Tile&)> MovementBlocked = [&](const Tile& T) -> bool
+    {
+        // Gorillas can't normally walk through other gorillas
+        // or other players
+
+        const auto Area1 = WorldArea(T, 1, 1);
+        if (!Area1)
+            return true;
+
+        bool IntersectsWithGorilla = std::any_of(Gorillas.begin(), Gorillas.end(), [&Area1](const WorldArea& A) -> bool { return A && Area1.IntersectsWith(A); });
+        bool IntersectsWithPlayer = std::any_of(Players.begin(), Players.end(), [&Area1](const WorldArea& A) -> bool { return A && Area1.IntersectsWith(A); });
+
+        return !IntersectsWithGorilla && !IntersectsWithPlayer;
+
+        // There is a special case where if a player walked through
+        // a gorilla, or a player walked through another player,
+        // the tiles that were walked through becomes
+        // walkable, but I didn't feel like it's necessary to handle
+        // that special case as it should rarely happen.
+    };
+
+    return this->GetLastWorldArea()->CalculateNextTravellingPoint(TargetArea, true, MovementBlocked);
+}
+
 bool Gorilla::IsDead() const
 {
     return this->LastHealthPercentage == 0.00 || Internal::GetHealthPercentage(*this) == 0.00 || this->GetAnimationID() == Globals::Gorillas::ANIMATION_DYING;
@@ -89,8 +118,56 @@ std::uint32_t Gorilla::CountNextPossibleAttackStyles() const
     return Styles;
 }
 
-void Gorilla::Draw() const
+void Gorilla::Draw(bool Emphasize, const WorldArea& NextTravelingPoint) const
 {
-    Paint::DrawConvex(this->GetConvex(), 0, 255, 255, 255);
-    Paint::DrawTile(this->GetTrueLocation(), 0, 255, 255, 255);
+    auto Interacting = this->GetInteractingPlayer();
+    auto Target = GameListener::GetPlayer(Interacting);
+    auto TrueLoc = this->GetTrueLocation();
+    auto TrueLocPoint = Internal::TileToMainscreen(TrueLoc, 0, 0, 0);
+
+    Paint::Pixel IndexColor = { 0, 255, 0, static_cast<uint8_t>(Emphasize ? 255 : 100) };
+    Paint::Pixel StyleColor = { 0, 255, 255, static_cast<uint8_t>(Emphasize ? 255 : 100) };
+    Paint::Pixel LineColor = { 255, 0, 0, static_cast<uint8_t>(Emphasize ? 255 : 100) };
+    Paint::Pixel TileColor = { 0, 255, 255, static_cast<uint8_t>(Emphasize ? 255 : 100) };
+    Paint::Pixel TravelPointColor = { 0, 255, 0, static_cast<uint8_t>(Emphasize ? 255 : 100) };
+
+    if (Emphasize)
+    {
+        Paint::DrawConvex(this->GetConvex(), IndexColor.Red, IndexColor.Green, IndexColor.Blue, IndexColor.Alpha);
+        Paint::DrawTile(TrueLoc, TileColor.Red, TileColor.Green, TileColor.Blue, TileColor.Alpha);
+        if (NextTravelingPoint && LastWorldArea)
+        {
+            const auto PredictedTile = NextTravelingPoint.AsTile();
+            const auto LastWorldAreaTile = GetLastWorldArea()->AsTile();
+
+            auto DistAB = PredictedTile.DistanceFrom(LastWorldAreaTile);
+            auto DistRL = std::max(std::abs(PredictedTile.X - LastWorldAreaTile.X), std::abs(PredictedTile.Y - LastWorldAreaTile.Y));
+
+            auto DistAB_TrueLoc = PredictedTile.DistanceFrom(TrueLoc);
+            auto DistRL_TrueLoc = std::max(std::abs(PredictedTile.X - TrueLoc.X), std::abs(PredictedTile.Y - TrueLoc.Y));
+
+            std::string Text = std::to_string(DistAB) + " | " + std::to_string(DistRL)
+                               + "\n" + std::to_string(DistAB_TrueLoc) + " | " + std::to_string(DistRL_TrueLoc);
+            Paint::DrawTile(PredictedTile, TravelPointColor.Red, TravelPointColor.Green, TravelPointColor.Blue, TravelPointColor.Alpha);
+            Paint::DrawString(Text, Internal::TileToMainscreen(PredictedTile, 0, 0, 0), TravelPointColor.Red, TravelPointColor.Green, TravelPointColor.Blue, TravelPointColor.Alpha);
+        }
+    }
+
+    if (Target && *Target)
+    {
+        auto TargetLoc = Target->GetTile();
+        auto PointB = Internal::TileToMainscreen(TargetLoc, 0, 0, 0);
+        Paint::DrawLine(TrueLocPoint, PointB, LineColor.Red, LineColor.Green, LineColor.Blue, LineColor.Alpha);
+        Paint::DrawString(std::to_string(Target->GetIndex()), PointB - Point(0, 15), LineColor.Red, LineColor.Green, LineColor.Blue, LineColor.Alpha);
+    }
+
+    std::string StyleStr;
+    if (this->NextPossibleAttackStyles & MELEE_FLAG) StyleStr += "MELEE ";
+    if (this->NextPossibleAttackStyles & RANGED_FLAG) StyleStr += "RANGED ";
+    if (this->NextPossibleAttackStyles & MAGIC_FLAG) StyleStr += "MAGIC ";
+    if (this->NextPossibleAttackStyles & BOULDER_FLAG) StyleStr += "BOULDER ";
+    StyleStr += "(" + std::to_string(this->CountNextPossibleAttackStyles()) + ")";
+    Point Text = Internal::TileToMainscreen(this->GetTile(), 0, 0, 0) - Point(0, 25);
+    Paint::DrawString(std::to_string(this->GetIndex()) + " | " + std::to_string(this->DisabledMeleeMovementTicks) + " | " + StyleStr, Text, IndexColor.Red, IndexColor.Green, IndexColor.Blue, IndexColor.Alpha); Text.Y += 20;
+    //Paint::DrawString(StyleStr, Text, StyleColor.Red, StyleColor.Green, StyleColor.Blue, StyleColor.Alpha); Text.Y += 20;
 }

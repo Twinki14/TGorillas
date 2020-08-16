@@ -27,6 +27,10 @@ public:
     static void DrawPlayers();
     static void DrawProjectiles();
 
+    static std::shared_ptr<Gorilla> GetCurrentGorilla();
+    static std::shared_ptr<TrackedPlayer> GetPlayer(const Internal::Player& P);
+    static bool AnyActiveBoulderOn(const Tile& T);
+
 private:
 
     static bool IsGorilla(std::int32_t ID);
@@ -81,7 +85,7 @@ private:
     inline static std::map<std::int32_t, std::shared_ptr<TrackedPlayer>> TrackedPlayers;
     static void TrackPlayer(std::shared_ptr<TrackedPlayer> P, std::int32_t Index);
     static std::shared_ptr<TrackedPlayer> GetPlayer(std::int32_t Index);
-    static std::shared_ptr<TrackedPlayer> GetPlayer(const Internal::Player& P);
+    //static std::shared_ptr<TrackedPlayer> GetPlayer(const Internal::Player& P);
 
     inline static std::mutex ProjectilesLock;
     inline static std::mutex BouldersLock;
@@ -99,9 +103,11 @@ private:
         std::int32_t FinishTick = 0;
     };
 
-    inline static std::mutex PendingAttacksLock;
     inline static std::vector<PendingAttack> PendingAttacks;
     static void AddPendingAttack(const PendingAttack& P);
+
+    static std::vector<WorldArea> GetPlayerAreas();
+    static std::vector<WorldArea> GetGorillaAreas(std::int32_t Index, bool Lock = true);
 
     template<typename Function>
     inline static void ForEachGorillas(Function _f)

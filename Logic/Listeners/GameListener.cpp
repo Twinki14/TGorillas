@@ -1,9 +1,11 @@
 #include "GameListener.hpp"
 #include "../Gorillas.hpp"
+#include "../Travel.hpp"
 #include <Core/Internal.hpp>
 #include <TScript.hpp>
 #include <functional>
 #include <Game/Interfaces/Mainscreen.hpp>
+#include <Utilities/Mainscreen.hpp>
 
 GameListener& GameListener::Instance()
 {
@@ -13,102 +15,74 @@ GameListener& GameListener::Instance()
 
 void GameListener::DrawGorillas()
 {
+    if (GameListener::CurrentGorilla && *GameListener::CurrentGorilla)
+    {
+        auto Interacting = CurrentGorilla->GetInteractingPlayer();
+        auto Target = GameListener::GetPlayer(Interacting);
+
+        WorldArea NextArea;
+        if (Target && *Target && *Target->GetLastWorldArea() && *CurrentGorilla->GetLastWorldArea())
+        {
+            std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(CurrentGorilla->GetIndex(), false);
+            std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas();
+            NextArea = CurrentGorilla->GetNextTravelingPoint(*Target->GetLastWorldArea(), GorillaAreas, PlayerAreas);
+
+            auto State = Gorillas::GetState();
+
+            std::string Text;
+            if (State & Gorillas::SWITCH_PRAYER_MELEE) Text += "SWITCH_PRAYER_MELEE\n";
+            if (State & Gorillas::SWITCH_PRAYER_RANGED) Text += "SWITCH_PRAYER_RANGED\n";
+            if (State & Gorillas::SWITCH_PRAYER_MAGIC) Text += "SWITCH_PRAYER_MAGIC\n";
+            //if (State & Gorillas::SINGLE_SWITCH_PRAYER) Text += "SINGLE_SWITCH_PRAYER\n";
+            if (State & Gorillas::MELEE_MOVE) Text += "MELEE_MOVE\n";
+            if (State & Gorillas::EQUIP_MELEE) Text += "EQUIP_MELEE\n";
+            if (State & Gorillas::EQUIP_RANGED) Text += "EQUIP_RANGED\n";
+            if (State & Gorillas::EQUIP_SPECIAL) Text += "EQUIP_SPECIAL\n";
+            if (State & Gorillas::BOULDER) Text += "BOULDER\n";
+            Paint::DrawString(Text, Internal::TileToMainscreen(Target->GetTile(), 0, 0, 0) + Point(20, 0), 0, 255, 255, 255);
+        }
+
+        CurrentGorilla->Draw(true, NextArea);
+    }
+    return;
+
+
     std::shared_lock Lock(GorillasLock);
-    std::vector<WorldArea> PlayerAreas;
-
-    if (GameListener::CurrentGorilla)
-        Paint::DrawConvex(GameListener::CurrentGorilla->GetConvex(), 0, 255, 0, 255);
-
     for (auto [Index, Gorilla] : GameListener::TrackedGorillas)
     {
         if (!Gorilla) continue;
 
-        auto Interacting = Gorilla->GetInteractingPlayer();
-        auto Target = GameListener::GetPlayer(Interacting);
-
-        if (Target && *Target)
-            Paint::DrawString(std::to_string(Target->GetIndex()), Internal::TileToMainscreen(Target->GetTile(), 0, 0, 0), 0, 255, 0, 255);
-
-        Point Next = Internal::TileToMainscreen(Gorilla->GetTile(), 0, 0, 0);
-
-        Paint::DrawString(std::to_string(Gorilla->GetIndex())
-                          + " | " + std::to_string(Gorilla->AttacksUntilSwitch)
-                          + " | " + std::to_string(Gorilla->LastHealthPercentage),
-                          Next, 0, 255, 0, 255); Next.Y += 20;
-
-        if (Gorilla->NextPossibleAttackStyles & Gorilla::MELEE_FLAG)
+        if (GameListener::CurrentGorilla && GameListener::CurrentGorilla->GetIndex() == Index)
         {
-            Paint::DrawString("MELEE", Next, 0, 255, 255, 255);
-            Next.Y += 20;
-        }
+            auto Interacting = Gorilla->GetInteractingPlayer();
+            auto Target = GameListener::GetPlayer(Interacting);
 
-        if (Gorilla->NextPossibleAttackStyles & Gorilla::RANGED_FLAG)
-        {
-            Paint::DrawString("RANGED", Next, 0, 255, 255, 255);
-            Next.Y += 20;
-        }
-
-        if (Gorilla->NextPossibleAttackStyles & Gorilla::MAGIC_FLAG)
-        {
-            Paint::DrawString("MAGIC", Next, 0, 255, 255, 255);
-            Next.Y += 20;
-        }
-
-        if (Gorilla->NextPossibleAttackStyles & Gorilla::BOULDER_FLAG)
-        {
-            Paint::DrawString("BOULDER", Next, 0, 255, 255, 255);
-            Next.Y += 20;
-        }
-
-        if (Target && *Target && *Target->GetLastWorldArea() && *Gorilla->GetLastWorldArea())
-        {
-            std::vector<WorldArea> GorillaAreas;
-            for (auto [I, G] : GameListener::TrackedGorillas)
-                if (G && I != Gorilla->GetIndex())
-                    GorillaAreas.emplace_back(G->GetIndex() < Gorilla->GetIndex() ? G->GetWorldArea() : *G->GetLastWorldArea());
-
-            if (PlayerAreas.empty())
+            WorldArea NextArea;
+            if (Target && *Target && *Target->GetLastWorldArea() && *Gorilla->GetLastWorldArea())
             {
-                PlayersLock.lock();
-                for (auto [I, P] : GameListener::TrackedPlayers)
-                    if (P) PlayerAreas.emplace_back(*P->GetLastWorldArea());
-                PlayersLock.unlock();
+                std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), false);
+                std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas();
+                NextArea = Gorilla->GetNextTravelingPoint(Target->GetWorldArea(), GorillaAreas, PlayerAreas);
+
+                auto State = Gorillas::GetState();
+
+                std::string Text;
+
+                if (State & Gorillas::SWITCH_PRAYER_MELEE) Text += "SWITCH_PRAYER_MELEE\n";
+                if (State & Gorillas::SWITCH_PRAYER_RANGED) Text += "SWITCH_PRAYER_RANGED\n";
+                if (State & Gorillas::SWITCH_PRAYER_MAGIC) Text += "SWITCH_PRAYER_MAGIC\n";
+                if (State & Gorillas::SINGLE_SWITCH_PRAYER) Text += "SINGLE_SWITCH_PRAYER\n";
+                if (State & Gorillas::MELEE_MOVE) Text += "MELEE_MOVE\n";
+                if (State & Gorillas::EQUIP_MELEE) Text += "EQUIP_MELEE\n";
+                if (State & Gorillas::EQUIP_RANGED) Text += "EQUIP_RANGED\n";
+                if (State & Gorillas::EQUIP_SPECIAL) Text += "EQUIP_SPECIAL\n";
+                Paint::DrawString(Text, Internal::TileToMainscreen(Target->GetTile(), 0, 0, 0) + Point(20, 0), 0, 255, 255, 255);
             }
 
-            WorldArea PredictedNewArea = Gorilla->GetLastWorldArea()->CalculateNextTravellingPoint(
-                    Target->GetWorldArea(), true,
-                    [&](const Tile& T) -> bool
-                    {
-                        // Gorillas can't normally walk through other gorillas
-                        // or other players
+            Gorilla->Draw(true, NextArea);
 
-                        const auto Area1 = WorldArea(T, 1, 1);
-                        if (!Area1) return true;
-
-                        auto MatchingG = std::find_if(GorillaAreas.begin(), GorillaAreas.end(),
-                                                      [&Area1](const WorldArea& A) -> bool
-                                                      { return A && Area1.IntersectsWith(A); });
-
-                        if (MatchingG == GorillaAreas.end())
-                        {
-                            auto MatchingP = std::find_if(PlayerAreas.begin(), PlayerAreas.end(),
-                                                          [&Area1](const WorldArea& A) -> bool
-                                                          { return A && Area1.IntersectsWith(A); });
-                            return MatchingP == PlayerAreas.end();
-                        }
-
-                        return false;
-
-                        // There is a special case where if a player walked through
-                        // a gorilla, or a player walked through another player,
-                        // the tiles that were walked through becomes
-                        // walkable, but I didn't feel like it's necessary to handle
-                        // that special case as it should rarely happen.
-                    });
-
-            Paint::DrawTile(PredictedNewArea.AsTile(), 0, 255, 0, 255);
-            Paint::DrawTile(Gorilla->GetTrueLocation(), 0, 255, 255, 255);
-        }
+        } //else
+            //Gorilla->Draw();
     }
 }
 
@@ -165,7 +139,7 @@ void GameListener::CheckNPCs()
         GameListener::LastNPCUpdateTick = HighestNPCTick;
     }
 
-    //if (T.GetTimeElapsed() >= 2) DebugLog("[GameListener] > Took {}ms", T.GetTimeElapsed());
+    if (T.GetTimeElapsed() >= 2) DebugLog("[GameListener] > Took {}ms", T.GetTimeElapsed());
 }
 
 void GameListener::CheckPlayers()
@@ -198,14 +172,14 @@ void GameListener::CheckPlayers()
         GameListener::LastPlayerUpdateTick = HighestPlayerTick;
     }
 
-    //if (T.GetTimeElapsed() >= 2) DebugLog("[GameListener] > Took {}ms", T.GetTimeElapsed());
+    if (T.GetTimeElapsed() >= 2) DebugLog("[GameListener] > Took {}ms", T.GetTimeElapsed());
 }
 
 void GameListener::CheckHitsplats()
 {
     Timer T;
 
-    PlayersLock.lock();
+    PlayersLock.lock_shared();
     for (auto [Index, Player] : GameListener::TrackedPlayers)
     {
         if (!Player) continue;
@@ -226,7 +200,7 @@ void GameListener::CheckHitsplats()
             }
         }
     }
-    PlayersLock.unlock();
+    PlayersLock.unlock_shared();
 
     GorillasLock.lock_shared();
     for (auto [Index, Gorilla] : GameListener::TrackedGorillas)
@@ -252,7 +226,7 @@ void GameListener::CheckHitsplats()
     }
     GorillasLock.unlock_shared();
 
-    //if (T.GetTimeElapsed() >= 2) DebugLog("[GameListener] > Took {}ms", T.GetTimeElapsed());
+    if (T.GetTimeElapsed() >= 2) DebugLog("[GameListener] > Took {}ms", T.GetTimeElapsed());
 }
 
 void GameListener::CheckProjectiles()
@@ -286,18 +260,18 @@ void GameListener::CheckProjectiles()
             GameListener::TrackProjectile(P);
         }
     }
-    //if (T.GetTimeElapsed() >= 2)  DebugLog("[GameListener] > Took {}ms", T.GetTimeElapsed());
+    if (T.GetTimeElapsed() >= 2)  DebugLog("[GameListener] > Took {}ms", T.GetTimeElapsed());
 }
 
 void GameListener::CheckCurrentGorilla()
 {
-    auto Player = GameListener::GetPlayer(GameListener::LocalPlayerIndex);
-    if (!Player || !*Player) return;
+    auto Player = Internal::GetLocalPlayer();
+    if (!Player) return;
 
     std::int32_t ProtectedStyle = 0;
-    const auto ProtectionIcon = Player->GetOverheadIcon();
+    const auto ProtectionIcon = Player.GetOverheadIcon();
     const auto EquippedStyle = Gorillas::GetEquippedStyle();
-    const auto PlayerLoc = Player->GetTrueLocation();
+    const auto PlayerLoc = Mainscreen::GetTrueLocation();
     switch (ProtectionIcon)
     {
         case Globals::ICON_MELEE:   ProtectedStyle = Gorilla::MELEE_FLAG; break;
@@ -306,35 +280,6 @@ void GameListener::CheckCurrentGorilla()
         default: break;
     }
 
-/*    if (GameListener::CurrentGorilla && *GameListener::CurrentGorilla)
-    {
-        if (GameListener::CurrentGorilla->IsDead())
-        {
-            DebugLog("Reset because dead");
-            GameListener::CurrentGorilla = std::make_shared<Gorilla>();
-        } else
-        {
-            auto Match = GameListener::GetGorilla(GameListener::CurrentGorilla->GetIndex());
-            if (!Match || !*Match)
-            {
-                DebugLog("Reset because not in cache");
-                GameListener::CurrentGorilla = std::make_shared<Gorilla>();
-            } else
-            {
-                auto Interacting = GameListener::CurrentGorilla->GetInteractingPlayer();
-                if (Interacting)
-                {
-                    auto Target = GameListener::GetPlayer(Interacting);
-                    if (Target && *Target && *Target != *Player)
-                    {
-                        DebugLog("Reset because wrong target");
-                        GameListener::CurrentGorilla = std::make_shared<Gorilla>();
-                    }
-                }
-            }
-        }
-    }*/
-
     std::shared_ptr<Gorilla> New;
     std::shared_lock Lock(GorillasLock);
     for (auto [Index, Gorilla] : GameListener::TrackedGorillas)
@@ -342,17 +287,27 @@ void GameListener::CheckCurrentGorilla()
         if (!Gorilla || !*Gorilla || Gorilla->IsDead()) continue;
 
         auto Interacting = Gorilla->GetInteractingPlayer();
-        auto Target = GameListener::GetPlayer(Interacting);
 
-        if (Target && *Target)
+        if (Interacting)
         {
-            if (*Target == *Player) // if it's targeting the local player
+            if (Interacting == Player) // if it's targeting the local player
             {
-                if (Gorilla->HealthBarShowing()) // if it's in combat
+                bool InCombat = Gorilla->InitiatedCombat && Gorilla->NextAttackTick > TickCount;
+
+                DebugLog("Gorilla > {}", Gorilla->GetIndex());
+                DebugLog("LastTickAnimation > {}", Gorilla->LastTickAnimation);
+                DebugLog("LastProjectileID > {}", Gorilla->LastProjectileID);
+                DebugLog("HealthBarPercentage > {}", Internal::GetHealthPercentage(*Gorilla));
+                DebugLog("InitiatedCombat > {}", Gorilla->InitiatedCombat);
+                DebugLog("NextAttackTick > {}", Gorilla->NextAttackTick);
+                DebugLog("InteractIndex > {}", Gorilla->GetInteractIndex());
+                DebugLog("TickCount > {}", TickCount);
+                DebugLog("---------");
+
+                if (InCombat) // if it's in combat
                 {
-                    //DebugLog("Set because player target");
                     New = Gorilla;
-                    return;
+                    break;
                 }
             } else
                 continue;
@@ -404,7 +359,6 @@ void GameListener::CheckCurrentGorilla()
                 New = Gorilla;
         } else
         {
-            //DebugLog("Set because null");
             New = Gorilla;
         }
     }
@@ -428,15 +382,16 @@ void GameListener::CheckGorillaAttackStyleSwitch(std::shared_ptr<Gorilla> G, std
 
 void GameListener::CheckGorillaAttacks()
 {
-    GorillasLock.lock();
+    std::shared_lock Lock(GorillasLock);
     std::vector<WorldArea> PlayerAreas;
     for (auto [Index, Gorilla] : GameListener::TrackedGorillas)
     {
-        auto Interacting = Gorilla->GetInteractingPlayer();
+        Internal::Player Interacting = Gorilla->GetInteractingPlayer();
         auto Target = GameListener::GetPlayer(Interacting);
 
         if (Gorilla->LastTickInteractingIndex != -1 && !Interacting) // No longer in combat
         {
+            DebugLog("Combat false > {}", Index);
             Gorilla->InitiatedCombat = false;
         } else if (Target && *Target && *Target->GetLastWorldArea() && !Gorilla->InitiatedCombat
                    && TickCount < Gorilla->NextAttackTick
@@ -551,50 +506,11 @@ void GameListener::CheckGorillaAttacks()
 
             if (Target && *Target && *Target->GetLastWorldArea() && *Gorilla->GetLastWorldArea())
             {
-                std::vector<WorldArea> GorillaAreas;
-                for (auto [I, G] : GameListener::TrackedGorillas)
-                    if (G && I != Gorilla->GetIndex())
-                        GorillaAreas.emplace_back(G->GetIndex() < Gorilla->GetIndex() ? G->GetWorldArea() : *G->GetLastWorldArea());
-
+                std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), false);
                 if (PlayerAreas.empty())
-                {
-                    PlayersLock.lock();
-                    for (auto [I, P] : GameListener::TrackedPlayers)
-                        if (P) PlayerAreas.emplace_back(*P->GetLastWorldArea());
-                    PlayersLock.unlock();
-                }
+                    PlayerAreas = GameListener::GetPlayerAreas();
 
-                WorldArea PredictedNewArea = Gorilla->GetLastWorldArea()->CalculateNextTravellingPoint(
-                        Target->GetWorldArea(), true,
-                        [&](const Tile& T) -> bool
-                        {
-                            // Gorillas can't normally walk through other gorillas
-                            // or other players
-
-                            const auto Area1 = WorldArea(T, 1, 1);
-                            if (!Area1) return true;
-
-                            auto MatchingG = std::find_if(GorillaAreas.begin(), GorillaAreas.end(),
-                                                          [&Area1](const WorldArea& A) -> bool
-                                                          { return A && Area1.IntersectsWith(A); });
-
-                            if (MatchingG == GorillaAreas.end())
-                            {
-                                auto MatchingP = std::find_if(PlayerAreas.begin(), PlayerAreas.end(),
-                                                              [&Area1](const WorldArea& A) -> bool
-                                                              { return A && Area1.IntersectsWith(A); });
-                                return MatchingP == PlayerAreas.end();
-                            }
-
-                            return false;
-
-                            // There is a special case where if a player walked through
-                            // a gorilla, or a player walked through another player,
-                            // the tiles that were walked through becomes
-                            // walkable, but I didn't feel like it's necessary to handle
-                            // that special case as it should rarely happen.
-                        });
-
+                auto PredictedNewArea = Gorilla->GetNextTravelingPoint(*Target->GetLastWorldArea(), GorillaAreas, PlayerAreas);
                 if (PredictedNewArea)
                 {
                     //std::int32_t Distance = Gorilla->GetLastWorldArea()->DistanceTo(*Target->GetLastWorldArea());
@@ -608,7 +524,7 @@ void GameListener::CheckGorillaAttacks()
                         auto DistAB = PredictedTile.DistanceFrom(LastWorldAreaTile);
                         auto DistRL = std::max(std::abs(PredictedTile.X - LastWorldAreaTile.X), std::abs(PredictedTile.Y - LastWorldAreaTile.Y));
 
-                        auto DistAB_Cur = PredictedTile.DistanceFrom(LastWorldAreaTile);
+                        auto DistAB_Cur = PredictedTile.DistanceFrom(Area);
                         auto DistRL_Cur = std::max(std::abs(PredictedTile.X - Area.X), std::abs(PredictedTile.Y - Area.Y));
 
                         ///DebugLog("LastWorldArea > {} > DistAB: {} -> {} | DistRL: {} -> {}", Gorilla->GetIndex(), DistAB, (std::int32_t) DistAB, DistRL, (std::int32_t) DistRL);
@@ -624,7 +540,6 @@ void GameListener::CheckGorillaAttacks()
 
                             DebugLog("Gorilla > {} | {} > DistAB: {} ", Gorilla->GetIndex(), Target->GetIndex(), DistAB);
                             DebugLog("Gorilla > {} | {} > DistRL: {} ", Gorilla->GetIndex(), Target->GetIndex(), DistRL);
-                            DebugLog("Gorilla > {} | {} > TrueLoc: {}, {} ", Gorilla->GetIndex(), Target->GetIndex(), TrueLoc.X, TrueLoc.Y);
                             if (PredictedTile.DistanceFrom(Gorilla->GetTrueLocation()) == 0.00)
                             {
                                 // Turn off all but MELEE
@@ -680,18 +595,16 @@ void GameListener::CheckGorillaAttacks()
         Gorilla->LastTickInteractingIndex = Gorilla->GetInteractIndex();
         Gorilla->RecentlyTookDamage = false;
         Gorilla->ChangedPrayerThisTick = false;
-        Gorilla->ChangedAttackStyleLastTick = Gorilla->ChangedAttackStyleThisTick.load();
+        Gorilla->ChangedAttackStyleLastTick = Gorilla->ChangedAttackStyleThisTick ? true : false;
         Gorilla->ChangedAttackStyleThisTick = false;
         Gorilla->LastTickOverheadIcon = Gorilla->GetOverheadIcon();
         Gorilla->LastProjectileID = -1;
         if (HealthPercentage >= 0.00) Gorilla->LastHealthPercentage = HealthPercentage;
     }
-    GorillasLock.unlock();
 }
 
 void GameListener::ProcessPendingAttacks()
 {
-    std::lock_guard<std::mutex> Lock(PendingAttacksLock);
     auto Iterator = GameListener::PendingAttacks.begin();
     while (Iterator != GameListener::PendingAttacks.end())
     {
@@ -729,7 +642,7 @@ void GameListener::ProcessPendingAttacks()
 
 void GameListener::UpdateTrackedPlayers()
 {
-    PlayersLock.lock();
+    std::shared_lock Lock(PlayersLock);
     for (auto [Index, Player] : GameListener::TrackedPlayers)
     {
         if (!Player) continue;
@@ -737,19 +650,17 @@ void GameListener::UpdateTrackedPlayers()
         Player->SetLastWorldArea(std::move(Area));
         Player->ClearRecentHitsplats();
     }
-    PlayersLock.unlock();
 }
 
 void GameListener::ClearPlayers()
 {
-    PlayersLock.lock();
+    std::unique_lock Lock(PlayersLock);
     auto Iterator = GameListener::TrackedPlayers.begin();
     while (Iterator != GameListener::TrackedPlayers.end())
     {
         GameListener::OnPlayerUnloaded(Iterator->second, Iterator->first);
         Iterator = GameListener::TrackedPlayers.erase(Iterator);
     }
-    PlayersLock.unlock();
 }
 
 void GameListener::ClearProjectiles()
@@ -761,9 +672,7 @@ void GameListener::ClearProjectiles()
 
 void GameListener::ClearPendingAttacks()
 {
-    PendingAttacksLock.lock();
     GameListener::PendingAttacks.clear();
-    PendingAttacksLock.unlock();
 }
 
 void GameListener::ClearRecentBoulders()
@@ -783,12 +692,11 @@ void GameListener::Loop()
     Timer T;
 
     GameListener::CheckNPCs();
-    if (!GameListener::TrackedGorillas.empty())
+    if (Travel::InCavern())
     {
         GameListener::CheckPlayers();
         GameListener::CheckHitsplats();
         GameListener::CheckProjectiles();
-        GameListener::CheckCurrentGorilla();
     } else
     {
         GameListener::ClearPlayers();
@@ -818,6 +726,7 @@ void GameListener::OnGameTick()
         GameListener::ProcessPendingAttacks();
         GameListener::UpdateTrackedPlayers();
         GameListener::ClearRecentBoulders();
+        GameListener::CheckCurrentGorilla();
     }
 }
 
@@ -842,7 +751,7 @@ void GameListener::OnNPCUpdate(std::vector<Internal::NPC>& NPCs, std::vector<std
         }
     }
 
-    GorillasLock.lock();
+    std::unique_lock Lock(GorillasLock);
     auto Iterator = GameListener::TrackedGorillas.begin();
     while (Iterator != GameListener::TrackedGorillas.end())
     {
@@ -854,7 +763,6 @@ void GameListener::OnNPCUpdate(std::vector<Internal::NPC>& NPCs, std::vector<std
         } else
             ++Iterator;
     }
-    GorillasLock.unlock();
 }
 
 void GameListener::OnGorillaLoaded(const std::shared_ptr<Gorilla>& G, std::int32_t Index)
@@ -967,7 +875,7 @@ void GameListener::OnPlayerUpdate(std::vector<Internal::Player>& Players, std::v
         }
     }
 
-    PlayersLock.lock();
+    std::unique_lock Lock(PlayersLock);
     auto Iterator = GameListener::TrackedPlayers.begin();
     while (Iterator != GameListener::TrackedPlayers.end())
     {
@@ -979,7 +887,6 @@ void GameListener::OnPlayerUpdate(std::vector<Internal::Player>& Players, std::v
         } else
             ++Iterator;
     }
-    PlayersLock.unlock();
 }
 
 void GameListener::OnPlayerLoaded(const std::shared_ptr<TrackedPlayer>& P, std::int32_t Index)
@@ -1008,7 +915,7 @@ void GameListener::OnProjectile(Interactable::Projectile& P)
         BouldersLock.unlock();
     } else
     {
-        GorillasLock.lock();
+        std::shared_lock Lock(GorillasLock);
         for (auto [Index, G] : GameListener::TrackedGorillas)
         {
             if (!G) continue;
@@ -1030,7 +937,6 @@ void GameListener::OnProjectile(Interactable::Projectile& P)
             //DebugLog("Tiles > {}, {} | {}, {} - {}, {} > {}", ProjTile.X, ProjTile.Y, GTile.X, GTile.Y, TrueGTile.X, TrueGTile.Y, Matches);
             //DebugLog("Tiles > {}, {} > {}", DistG, DistTrueG, Matches);
         }
-        GorillasLock.unlock();
     }
 }
 
@@ -1081,6 +987,11 @@ std::shared_ptr<Gorilla> GameListener::GetGorilla(Internal::NPC& N)
         }
     }
     return std::shared_ptr<Gorilla>();
+}
+
+std::shared_ptr<Gorilla> GameListener::GetCurrentGorilla()
+{
+    return GameListener::CurrentGorilla;
 }
 
 void GameListener::TrackPlayer(std::shared_ptr<TrackedPlayer> P, std::int32_t Index)
@@ -1160,10 +1071,44 @@ bool GameListener::AnyBoulderOn(const Tile& T)
     return P != GameListener::RecentBoulderLocations.end();
 }
 
+bool GameListener::AnyActiveBoulderOn(const Tile& T)
+{
+    if (!T) return false;
+    std::lock_guard<std::mutex> Lock(ProjectilesLock);
+    auto Find = [&T](const Interactable::Projectile& P) -> bool
+        { return P.GetID() == Globals::Gorillas::PROJECTILE_BOULDER && T == P.GetTile(); };
+    auto P = std::find_if(GameListener::TrackedProjectiles.begin(), GameListener::TrackedProjectiles.end(), Find);
+    return P != GameListener::TrackedProjectiles.end();
+}
+
 void GameListener::AddPendingAttack(const GameListener::PendingAttack& P)
 {
-    std::lock_guard<std::mutex> Lock(PendingAttacksLock);
     PendingAttacks.emplace_back(P);
+}
+
+std::vector<WorldArea> GameListener::GetPlayerAreas()
+{
+    std::vector<WorldArea> Result;
+    std::shared_lock Lock(PlayersLock);
+    for (auto [I, P] : GameListener::TrackedPlayers)
+    {
+        if (P)
+            Result.emplace_back(*P->GetLastWorldArea());
+    }
+    return Result;
+}
+
+std::vector<WorldArea> GameListener::GetGorillaAreas(std::int32_t Index, bool Lock)
+{
+    std::vector<WorldArea> Result;
+    if (Lock)
+        std::shared_lock GLock(GorillasLock);
+    for (auto [I, G] : GameListener::TrackedGorillas)
+    {
+        if (G && I != Index)
+            Result.emplace_back(G->GetIndex() < Index ? G->GetWorldArea() : *G->GetLastWorldArea());
+    }
+    return Result;
 }
 
 GameListener::GameListener() : ListenerTask("GameListener", std::chrono::milliseconds(20), GameListener::Loop)

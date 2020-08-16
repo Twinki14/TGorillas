@@ -12,10 +12,7 @@
 void Config::RequestArgs()
 {
     for (const auto& O : Config::Cfg.as_object())
-    {
-        std::cout << O.key() << std::endl;
         RequestArgument(O.key(), "");
-    }
 }
 
 void Config::LoadArgs(const std::string& FileName)
@@ -156,7 +153,7 @@ void Config::SetGearsets()
 
     if (Config::Cfg.count("SpecialWeapon"))
     {
-        switch (Config::Cfg["SpecialWeapon"].as_integer<int>())
+        switch (Config::Cfg["SpecialWeapon"].as_integer<int32_t>())
         {
             case TOXIC_BLOWPIPE:
             {

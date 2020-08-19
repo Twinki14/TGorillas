@@ -35,6 +35,25 @@ std::int32_t Gorilla::GetProtectionStyle() const
     return -1;
 }
 
+std::int32_t Gorilla::GetFacingDirection() const
+{
+    switch (this->GetAngle())
+    {
+        case NORTH_WEST + 1 ... NORTH: return NORTH;
+        case NORTH + 1 ... NORTH_EAST: return NORTH_EAST;
+        case NORTH_EAST + 1 ... EAST: return EAST;
+        case EAST + 1 ... SOUTH_EAST: return SOUTH_EAST;
+
+        case SOUTH:
+        case SOUTH_EAST + 1 ... 2016: return SOUTH;
+        case SOUTH + 1 ... SOUTH_WEST: return SOUTH_WEST;
+        case SOUTH_WEST + 1 ... WEST: return WEST;
+        case WEST + 1 ... NORTH_WEST: return NORTH_WEST;
+        default: break;
+    }
+    return -1;
+}
+
 Internal::Player Gorilla::GetInteractingPlayer() const
 {
     return (Internal::Player) this->GetInteracting();
@@ -114,7 +133,6 @@ std::uint32_t Gorilla::CountNextPossibleAttackStyles() const
     if (NextPossibleAttackStyles & MELEE_FLAG) Styles++;
     if (NextPossibleAttackStyles & RANGED_FLAG) Styles++;
     if (NextPossibleAttackStyles & MAGIC_FLAG) Styles++;
-    if (NextPossibleAttackStyles & BOULDER_FLAG) Styles++;
     return Styles;
 }
 

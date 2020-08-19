@@ -2,6 +2,10 @@
 #define GORILLAS_HPP_INCLUDED
 
 #include <cstdint>
+#include <Game/Interfaces/GameTabs/Prayer.hpp>
+#include <Game/Interactable/Player.hpp>
+#include <memory>
+#include "Types/Gorilla.hpp"
 
 namespace Gorillas
 {
@@ -29,12 +33,23 @@ namespace Gorillas
 
     std::int32_t GetState();
     std::int32_t GetEquippedStyle();
+    std::int32_t GetEquippedWeaponStyle();
     std::int32_t GetDefenseAgainst(std::int32_t Style);
     std::int32_t GetProtectedStyle();
     std::int32_t GetProtectedStyle(const Interactable::Player& P);
+    std::vector<WorldArea> GetValidMovementAreas();
+    std::vector<std::pair<bool, Tile>> GetViableMoveTiles(double Distance);
+    Tile GetMeleeMoveTile(double Distance);
+    Tile GetBoulderMoveTile();
+
+    bool SwitchPrayer(Prayer::PRAYERS Prayer);
 
     bool WalkTo();
     bool Fight();
+
+    bool MeleeMove(std::int32_t& State, const std::shared_ptr<Gorilla>& CurrentGorilla);
+    bool BoulderMove(std::int32_t& State, const std::shared_ptr<Gorilla>& CurrentGorilla);
+    bool Prayers(std::int32_t& State, const std::shared_ptr<Gorilla>& CurrentGorilla);
 
     void OnGameTick();
 }

@@ -5,11 +5,11 @@
 #include <shared_mutex>
 #include <map>
 #include <Game/Interactable/Projectile.hpp>
-#include "ListenerTask.hpp"
+#include "LoopTask.hpp"
 #include "../Types/Gorilla.hpp"
 #include "../Types/TrackedPlayer.hpp"
 
-class GameListener : public ListenerTask
+class GameListener : public LoopTask
 {
 public:
     static GameListener& Instance();
@@ -31,6 +31,10 @@ public:
     static std::shared_ptr<TrackedPlayer> GetPlayer(const Internal::Player& P);
     static bool AnyActiveBoulderOn(const Tile& T);
 
+    static std::vector<WorldArea> GetPlayerAreas(bool IncludeLocal = false);
+    static std::vector<WorldArea> GetGorillaAreas(std::int32_t Index, bool Lock = true);
+    static std::vector<WorldArea> GetBoulderAreas();
+
 private:
 
     static bool IsGorilla(std::int32_t ID);
@@ -51,6 +55,7 @@ private:
     static void ClearProjectiles();
     static void ClearPendingAttacks();
     static void ClearRecentBoulders();
+    static void ClearCurrentGorilla();
 
     void OnStart() override;
     static void Loop();
@@ -80,6 +85,7 @@ private:
     static std::shared_ptr<Gorilla> GetGorilla(std::int32_t Index);
     static std::shared_ptr<Gorilla> GetGorilla(Gorilla& G);
     static std::shared_ptr<Gorilla> GetGorilla(Internal::NPC& N);
+    static bool GorillaTracked(std::int32_t Index);
 
     inline static std::shared_mutex PlayersLock;
     inline static std::map<std::int32_t, std::shared_ptr<TrackedPlayer>> TrackedPlayers;
@@ -87,7 +93,7 @@ private:
     static std::shared_ptr<TrackedPlayer> GetPlayer(std::int32_t Index);
     //static std::shared_ptr<TrackedPlayer> GetPlayer(const Internal::Player& P);
 
-    inline static std::mutex ProjectilesLock;
+    inline static std::shared_mutex ProjectilesLock;
     inline static std::mutex BouldersLock;
     inline static std::vector<Interactable::Projectile> TrackedProjectiles;
     inline static std::vector<Tile> RecentBoulderLocations;
@@ -105,9 +111,6 @@ private:
 
     inline static std::vector<PendingAttack> PendingAttacks;
     static void AddPendingAttack(const PendingAttack& P);
-
-    static std::vector<WorldArea> GetPlayerAreas();
-    static std::vector<WorldArea> GetGorillaAreas(std::int32_t Index, bool Lock = true);
 
     template<typename Function>
     inline static void ForEachGorillas(Function _f)

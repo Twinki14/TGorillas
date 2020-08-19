@@ -1,14 +1,14 @@
-#ifndef TLIB_LISTENERTASK_HPP_INCLUDED
-#define TLIB_LISTENERTASK_HPP_INCLUDED
+#ifndef TLIB_LOOPTASK_HPP_INCLUDED
+#define TLIB_LOOPTASK_HPP_INCLUDED
 
 #include <future>
 #include <atomic>
 
-class ListenerTask
+class LoopTask
 {
 public:
-    ListenerTask() = default;
-    ListenerTask(std::string Label,const std::chrono::duration<double>& Duration, void (*Loop)());
+    LoopTask() = default;
+    LoopTask(std::string Label, const std::chrono::duration<double>& Duration, void (*Loop)());
 
     bool Started() const;
     bool Running() const;
@@ -20,7 +20,7 @@ public:
     void Stop(bool Wait = false);
     void Wait() const;
 
-    virtual ~ListenerTask();
+    virtual ~LoopTask();
 private:
     std::string Label;
     void (*LoopFunc)() = nullptr;
@@ -39,4 +39,4 @@ private:
 
 };
 
-#endif // TLIB_LISTENERTASK_HPP_INCLUDED
+#endif // TLIB_LOOPTASK_HPP_INCLUDED

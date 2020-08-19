@@ -57,6 +57,18 @@ public:
     Gorilla();
     explicit Gorilla(Interactable::NPC& N, std::int32_t Index);
 
+    enum ACTOR_ANGLE_DIRECTION
+    {
+        SOUTH = 0,
+        SOUTH_WEST = 256,
+        WEST = 512,
+        NORTH_WEST = 768,
+        NORTH = 1024,
+        NORTH_EAST = 1280,
+        EAST = 1536,
+        SOUTH_EAST = 1792,
+    };
+
     enum STYLE_FLAGS
     {
         MELEE_FLAG      = 1 << 0,
@@ -68,6 +80,7 @@ public:
     std::int32_t GetIndex() const;
     std::int32_t GetOverheadIcon() const;
     std::int32_t GetProtectionStyle() const;
+    std::int32_t GetFacingDirection() const;
     Internal::Player GetInteractingPlayer() const;
     Tile GetTrueLocation() const;
     WorldArea GetWorldArea() const;

@@ -48,13 +48,14 @@ bool OnStart()
         Config::SetGearsets();
     }
 
-    SetLoopDelay(50);
+    SetLoopDelay(0);
 
     //if (GUI::Init())
     {
         Config::SaveArgs("default.json");
         Config::SetGearsets();
         Config::SetAntiban();
+        Config::CacheOSRSBoxItems();
         Script::Start(PaintMethod, true);
         return true;
     }
@@ -64,7 +65,25 @@ bool OnStart()
 
 bool Loop()
 {
+/*    Paint::Clear();
+    WorldArea Area = WorldArea(Internal::GetLocalPlayer());
+
+    for (int dx = -1; dx <= 1; dx++)
+    {
+        for (int dy = -1; dy <= 1; dy++)
+        {
+            if (dx == 0 && dy == 0)
+                continue;
+
+            if (Area.CanTravelInDirection(dx, dy))
+                Paint::DrawTile(Area.AsTile() + Tile(dx, dy), 0, 255, 255, 255);
+        }
+    }
+
+    Paint::SwapBuffer();*/
+
     GameListener::Instance().Start();
+    Wait(500);
     return true;
 
     if (Mainscreen::IsLoggedIn())

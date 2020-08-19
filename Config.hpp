@@ -72,6 +72,8 @@ public:
     inline static std::vector<std::string> AntibanTasks;
     inline static std::vector<std::string> AFKTasks;
 
+    static void CacheOSRSBoxItems();
+
     inline static const std::string GotifyHost = "twinki.ddns.net";
     inline static const std::string GotifyAuthPluginToken = "PzPu8plcKnRd37S";
     inline static const std::string GotifyAuthHeaderToken = "PzPu8plcKnRd37S";

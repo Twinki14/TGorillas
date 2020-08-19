@@ -30,8 +30,8 @@ set(SOURCE_FILES
         Logic/Gorillas.hpp
         Logic/Listeners/GameListener.cpp
         Logic/Listeners/GameListener.hpp
-        Logic/Listeners/ListenerTask.cpp
-        Logic/Listeners/ListenerTask.hpp
+        Logic/Listeners/LoopTask.cpp
+        Logic/Listeners/LoopTask.hpp
         Logic/Supplies.cpp
         Logic/Supplies.hpp
         Logic/Travel.cpp

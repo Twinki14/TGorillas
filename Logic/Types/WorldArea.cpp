@@ -29,6 +29,8 @@
  */
 
 #include <Core/Internal.hpp>
+#include <TScript.hpp>
+#include <Game/Interfaces/Mainscreen.hpp>
 #include "WorldArea.hpp"
 
 WorldArea::WorldArea(const Tile& WorldTile)
@@ -140,7 +142,10 @@ std::int32_t WorldArea::DistanceTo2D(const WorldArea& Other) const
 // Thank you 'Henke'!
 bool WorldArea::HasLineOfSightTo(const WorldArea& Other) const
 {
+    if (!*this || !Other) return false;
     if (Plane != Other.GetPlane()) return false;
+    if (Internal::GetGameState() != 30) return false;
+    if (Plane != Internal::GetClientPlane()) return false;
 
     const auto CollisionData = Internal::GetCollisionMap(Plane);
     const auto CollisionFlags = CollisionData.GetFlags();
@@ -149,6 +154,9 @@ bool WorldArea::HasLineOfSightTo(const WorldArea& Other) const
     const Point p1 = Point(this->GetSceneX(), this->GetSceneY());
     const Point p2 = Point(Other.GetSceneX(), Other.GetSceneY());
     if (p1 == p2) return true;
+
+    if (p1.X >= 104 || p1.Y >= 104) return false;
+    if (p2.X >= 104 || p2.Y >= 104) return false;
 
     int dx = p2.X - p1.X;
     int dy = p2.Y - p1.Y;
@@ -182,6 +190,7 @@ bool WorldArea::HasLineOfSightTo(const WorldArea& Other) const
         {
             x += direction;
             int y = yBig >> 16;
+            if (x >= 104 || y >= 104) return false;
             if ((CollisionFlags[x][y] & xFlags) != 0)
             {
                 // Collision while traveling on the x axis
@@ -189,6 +198,7 @@ bool WorldArea::HasLineOfSightTo(const WorldArea& Other) const
             }
             yBig += slope;
             int nextY = yBig >> 16;
+            if (x >= 104 || nextY >= 104) return false;
             if (nextY != y && (CollisionFlags[x][nextY] & yFlags) != 0)
             {
                 // Collision while traveling on the y axis
@@ -211,6 +221,7 @@ bool WorldArea::HasLineOfSightTo(const WorldArea& Other) const
         {
             y += direction;
             int x = xBig >> 16;
+            if (x >= 104 || y >= 104) return false;
             if ((CollisionFlags[x][y] & yFlags) != 0)
             {
                 // Collision while traveling on the y axis
@@ -219,6 +230,7 @@ bool WorldArea::HasLineOfSightTo(const WorldArea& Other) const
 
             xBig += slope;
             int nextX = xBig >> 16;
+            if (nextX >= 104 || y >= 104) return false;
             if (nextX != x && (CollisionFlags[nextX][y] & xFlags) != 0)
             {
                 // Collision while traveling on the x axis
@@ -344,7 +356,7 @@ bool WorldArea::CanTravelInDirection(std::int32_t DirectionX, std::int32_t Direc
 
     const auto CollisionData = Internal::GetCollisionMap(Plane);
     const auto CollisionFlags = CollisionData.GetFlags();
-    if (!CollisionData || CollisionFlags.empty()) return false;
+    if (!CollisionData || CollisionFlags.empty() || Internal::GetGameState() != 30) return false;
 
     if (DirectionX != 0)
     {

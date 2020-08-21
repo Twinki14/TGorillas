@@ -33,7 +33,6 @@ std::int32_t Gorillas::GetState()
     {
         if ((ProtectedStyle & Gorilla->NextPossibleAttackStyles) == 0)
         {
-            State |= SINGLE_SWITCH_PRAYER;
             if (Gorilla->NextPossibleAttackStyles & MELEE_FLAG)     State |= SWITCH_PRAYER_MELEE;
             if (Gorilla->NextPossibleAttackStyles & RANGED_FLAG)    State |= SWITCH_PRAYER_RANGED;
             if (Gorilla->NextPossibleAttackStyles & MAGIC_FLAG)     State |= SWITCH_PRAYER_MAGIC;
@@ -42,13 +41,15 @@ std::int32_t Gorillas::GetState()
     {
         if (Gorilla->NextPossibleAttackStyles & RANGED_FLAG && Gorilla->NextPossibleAttackStyles & MAGIC_FLAG)
         {
-            State &= ~SINGLE_SWITCH_PRAYER;
-            State |= SWITCH_PRAYER_RANGED;
-            State |= SWITCH_PRAYER_MAGIC;
+            if ((ProtectedStyle & RANGED_FLAG) == 0 && (ProtectedStyle & MAGIC_FLAG) == 0)
+            {
+                State |= SWITCH_PRAYER_RANGED;
+                State |= SWITCH_PRAYER_MAGIC;
+            }
         }
 
         if (NumberOfPossibleAttacks == 2 && Gorilla->NextPossibleAttackStyles & MELEE_FLAG)
-            State |= MELEE_MOVE;
+            State |= MELEE_MOVE; // TODO check if we're already far enough away?
     }
 
     if (EquippedStyle & GorillaProtectedStyle || EquippedStyle == 0)
@@ -186,141 +187,168 @@ std::vector<WorldArea> Gorillas::GetValidMovementAreas()
                 if (X == 0 && Y == 0) continue;
 
                 if (Area.CanTravelInDirection(X, Y))
-                    Result.emplace_back(WorldArea(Tile(X, Y, Area.GetPlane())));
+                    Result.emplace_back(Area.AsTile() + Tile(X, Y));
             }
         }
     }
     return Result;
 }
 
-std::vector<std::pair<bool, Tile>> Gorillas::GetViableMoveTiles(double Distance)
+std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles()
 {
     Timer T;
-    std::vector<std::pair<bool, Tile>> Tiles;
+
+    std::vector<std::pair<bool, WorldArea>> Tiles;
     std::shared_ptr<Gorilla> CurrentGorilla = GameListener::GetCurrentGorilla();
+    if (!CurrentGorilla || !*CurrentGorilla) return Tiles;
 
-    if (CurrentGorilla && *CurrentGorilla)
+    const auto PlayerPos = Mainscreen::GetTrueLocation();
+
+    auto ClientX = Internal::GetClientX();
+    auto ClientY = Internal::GetClientY();
+    auto CollisionFlags = Internal::GetCollisionMap(PlayerPos.Plane).GetFlags();
+
+    std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas(false);
+    std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(CurrentGorilla->GetIndex(), true);
+    std::vector<WorldArea> BoulderAreas = GameListener::GetBoulderAreas();
+
+    auto ModifiedCollisionFlags = CollisionFlags;
+    for (const auto& W : GorillaAreas)
     {
-        const auto PlayerPos = Mainscreen::GetTrueLocation();
-
-        auto CollisionFlags = Internal::GetCollisionMap(PlayerPos.Plane).GetFlags();
-        auto ClientX = Internal::GetClientX();
-        auto ClientY = Internal::GetClientY();
-        std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas(false);
-        std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(CurrentGorilla->GetIndex(), true);
-        std::vector<WorldArea> BoulderAreas = GameListener::GetBoulderAreas();
-
-        constexpr int CULL_LINE_OF_SIGHT_RANGE = 5;
-        WorldArea Area = CurrentGorilla->GetWorldArea();
-        auto FacingDirection = CurrentGorilla->GetFacingDirection();
-
-        for (int X = Area.GetX() - CULL_LINE_OF_SIGHT_RANGE; X <= Area.GetX() + CULL_LINE_OF_SIGHT_RANGE; X++)
+        for (int X = 0; X < W.GetWidth(); X++)
         {
-            for (int Y = Area.GetY() - CULL_LINE_OF_SIGHT_RANGE; Y <= Area.GetY() + CULL_LINE_OF_SIGHT_RANGE; Y++)
+            for (int Y = 0; Y < W.GetHeight(); Y++)
             {
-                if (X == Area.GetX() && Y == Area.GetY())
-                    continue;
+                Tile SceneT(W.GetSceneX() + X, W.GetSceneY() + Y);
+                if (SceneT.IsPositive()
+                    && SceneT.X < ModifiedCollisionFlags.size()
+                    && SceneT.Y < ModifiedCollisionFlags[SceneT.X].size())
+                    ModifiedCollisionFlags[SceneT.X][SceneT.Y] |= 0x20000; // BLOCK_LINE_OF_SIGHT_FULL
+            }
+        }
+    }
 
-                if (X == PlayerPos.X && Y == PlayerPos.Y)
-                    continue;
+    constexpr int CULL_LINE_OF_SIGHT_RANGE = 5;
+    WorldArea Area = CurrentGorilla->GetWorldArea();
+    auto FacingDirection = CurrentGorilla->GetFacingDirection();
 
-                if (X - ClientX < 0 ) continue;
-                if (X - ClientX > 103 ) continue;
-                if (Y - ClientY < 0 ) continue;
-                if (Y - ClientY > 103 ) continue;
-                auto Flag = CollisionFlags[X - ClientX][Y - ClientY];
-                if ((Flag == Pathfinding::CLOSED) || (Flag & Pathfinding::BLOCKED) || (Flag & Pathfinding::OCCUPIED) || (Flag & Pathfinding::SOLID))
-                    continue; // remove tiles that are blocked
+    for (int X = Area.GetX() - CULL_LINE_OF_SIGHT_RANGE; X <= Area.GetX() + CULL_LINE_OF_SIGHT_RANGE; X++)
+    {
+        for (int Y = Area.GetY() - CULL_LINE_OF_SIGHT_RANGE; Y <= Area.GetY() + CULL_LINE_OF_SIGHT_RANGE; Y++)
+        {
+            if (X == Area.GetX() && Y == Area.GetY())
+                continue;
 
-                Tile Next = Tile(X, Y);
+            // check against local player
+            if (X == PlayerPos.X && Y == PlayerPos.Y)
+                continue;
 
-                // check against boulders
-                if (std::any_of(BoulderAreas.begin(), BoulderAreas.end(),
-                                [&Next](const WorldArea& B) -> bool { return Next == B.AsTile(); }))
-                    continue;
+            if (X - ClientX < 0 || X - ClientX > 103) continue;
+            if (Y - ClientY < 0 || Y - ClientY > 103) continue;
+            auto Flag = CollisionFlags[X - ClientX][Y - ClientY];
+            if ((Flag == Pathfinding::CLOSED) || (Flag & Pathfinding::BLOCKED) || (Flag & Pathfinding::OCCUPIED) || (Flag & Pathfinding::SOLID))
+                continue; // remove tiles that are blocked
 
-                std::int32_t TileDirection = -1;
-                const auto Diff = Next - Area.AsTile();
-                if (Diff.X == 0 && Diff.Y > 0) TileDirection = Gorilla::NORTH;
-                if (Diff.X > 0 && Diff.Y > 0) TileDirection = Gorilla::NORTH_EAST;
-                if (Diff.X > 0 && Diff.Y == 0) TileDirection = Gorilla::EAST;
-                if (Diff.X > 0 && Diff.Y < 0) TileDirection = Gorilla::SOUTH_EAST;
-                if (Diff.X == 0 && Diff.Y < 0) TileDirection = Gorilla::SOUTH;
-                if (Diff.X < 0 && Diff.Y < 0) TileDirection = Gorilla::SOUTH_WEST;
-                if (Diff.X < 0 && Diff.Y == 0) TileDirection = Gorilla::WEST;
-                if (Diff.X < 0 && Diff.Y > 0) TileDirection = Gorilla::NORTH_WEST;
+            WorldArea Next(Tile(X, Y, Area.GetPlane()));
 
-                bool InFront = false;
-                switch (FacingDirection)
+            // check against current gorilla
+            if (Area.IntersectsWith(Next))
+                continue;
+
+            // check against boulders
+            if (std::any_of(BoulderAreas.begin(), BoulderAreas.end(), [&](const WorldArea& B) -> bool
+            { return B.IntersectsWith(Next); }))
+                continue;
+            // check against gorillas
+            if (std::any_of(GorillaAreas.begin(), GorillaAreas.end(), [&](const WorldArea& G) -> bool
+            { return G.IntersectsWith(Next); }))
+                continue;
+            // check against players
+            if (std::any_of(PlayerAreas.begin(), PlayerAreas.end(), [&](const WorldArea& P) -> bool
+            { return P.IntersectsWith(Next); }))
+                continue;
+
+            if (Area.DistanceTo(Next) <= Globals::Gorillas::MAX_ATTACK_RANGE && Area.HasLineOfSightTo(Next, ModifiedCollisionFlags))
+            {
+                auto PredictedNewArea = CurrentGorilla->GetNextTravelingPoint(Next, GorillaAreas, PlayerAreas);
+                if (PredictedNewArea)
                 {
-                    case Gorilla::NORTH:
-                        InFront = TileDirection != Gorilla::SOUTH_EAST
-                                  && TileDirection != Gorilla::SOUTH
-                                  && TileDirection != Gorilla::SOUTH_WEST;
-                        break;
-
-                    case Gorilla::NORTH_EAST:
-                        InFront = TileDirection != Gorilla::NORTH_WEST
-                                  && TileDirection != Gorilla::WEST
-                                  && TileDirection != Gorilla::SOUTH_WEST
-                                  && TileDirection != Gorilla::SOUTH
-                                  && TileDirection != Gorilla::SOUTH_EAST;
-                        break;
-
-                    case Gorilla::EAST:
-                        InFront = TileDirection != Gorilla::NORTH_WEST
-                                  && TileDirection != Gorilla::WEST
-                                  && TileDirection != Gorilla::SOUTH_WEST;
-                        break;
-
-                    case Gorilla::SOUTH_EAST:
-                        InFront = TileDirection != Gorilla::NORTH_EAST
-                                  && TileDirection != Gorilla::NORTH
-                                  && TileDirection != Gorilla::NORTH_WEST
-                                  && TileDirection != Gorilla::WEST
-                                  && TileDirection != Gorilla::SOUTH_WEST;
-                        break;
-
-                    case Gorilla::SOUTH:
-                        InFront = TileDirection != Gorilla::NORTH
-                                  && TileDirection != Gorilla::NORTH_WEST
-                                  && TileDirection != Gorilla::NORTH_EAST;
-                        break;
-
-                    case Gorilla::SOUTH_WEST:
-                        InFront = TileDirection != Gorilla::SOUTH_EAST
-                                  && TileDirection != Gorilla::EAST
-                                  && TileDirection != Gorilla::NORTH_EAST
-                                  && TileDirection != Gorilla::NORTH
-                                  && TileDirection != Gorilla::NORTH_WEST;
-                        break;
-
-                    case Gorilla::WEST:
-                        InFront = TileDirection != Gorilla::NORTH_EAST
-                                  && TileDirection != Gorilla::EAST
-                                  && TileDirection != Gorilla::SOUTH_EAST;
-                        break;
-
-                    case Gorilla::NORTH_WEST:
-                        InFront = TileDirection != Gorilla::SOUTH_WEST
-                                  && TileDirection != Gorilla::SOUTH
-                                  && TileDirection != Gorilla::SOUTH_EAST
-                                  && TileDirection != Gorilla::EAST
-                                  && TileDirection != Gorilla::NORTH_EAST;
-                        break;
-
-                    default: break;
-                }
-
-                auto NextDistance = Area.DistanceTo(Next);
-                if (NextDistance <= Globals::Gorillas::MAX_ATTACK_RANGE && Area.HasLineOfSightTo(Next))
-                {
-                    auto PredictedNewArea = CurrentGorilla->GetNextTravelingPoint(Next, GorillaAreas, PlayerAreas);
-                    if (PredictedNewArea)
+                    auto PredictedTile = PredictedNewArea.AsTile();
+                    if (PredictedTile.DistanceFrom(Area.AsTile()) >= 1.00) // Can path to 'next'
                     {
-                        auto PredictedTile = PredictedNewArea.AsTile();
-                        if (PredictedTile.DistanceFrom(CurrentGorilla->GetWorldArea().AsTile()) >= Distance)
-                            Tiles.emplace_back(std::make_pair(InFront, std::move(Next)));
+                        std::int32_t TileDirection = -1;
+                        const auto Diff = Next.AsTile() - Area.AsTile();
+                        if (Diff.X == 0 && Diff.Y > 0) TileDirection = Gorilla::NORTH;
+                        if (Diff.X > 0 && Diff.Y > 0) TileDirection = Gorilla::NORTH_EAST;
+                        if (Diff.X > 0 && Diff.Y == 0) TileDirection = Gorilla::EAST;
+                        if (Diff.X > 0 && Diff.Y < 0) TileDirection = Gorilla::SOUTH_EAST;
+                        if (Diff.X == 0 && Diff.Y < 0) TileDirection = Gorilla::SOUTH;
+                        if (Diff.X < 0 && Diff.Y < 0) TileDirection = Gorilla::SOUTH_WEST;
+                        if (Diff.X < 0 && Diff.Y == 0) TileDirection = Gorilla::WEST;
+                        if (Diff.X < 0 && Diff.Y > 0) TileDirection = Gorilla::NORTH_WEST;
+
+                        bool InFront = false;
+                        switch (FacingDirection)
+                        {
+                            case Gorilla::NORTH:
+                                InFront = TileDirection != Gorilla::SOUTH_EAST
+                                          && TileDirection != Gorilla::SOUTH
+                                          && TileDirection != Gorilla::SOUTH_WEST;
+                                break;
+
+                            case Gorilla::NORTH_EAST:
+                                InFront = TileDirection != Gorilla::NORTH_WEST
+                                          && TileDirection != Gorilla::WEST
+                                          && TileDirection != Gorilla::SOUTH_WEST
+                                          && TileDirection != Gorilla::SOUTH
+                                          && TileDirection != Gorilla::SOUTH_EAST;
+                                break;
+
+                            case Gorilla::EAST:
+                                InFront = TileDirection != Gorilla::NORTH_WEST
+                                          && TileDirection != Gorilla::WEST
+                                          && TileDirection != Gorilla::SOUTH_WEST;
+                                break;
+
+                            case Gorilla::SOUTH_EAST:
+                                InFront = TileDirection != Gorilla::NORTH_EAST
+                                          && TileDirection != Gorilla::NORTH
+                                          && TileDirection != Gorilla::NORTH_WEST
+                                          && TileDirection != Gorilla::WEST
+                                          && TileDirection != Gorilla::SOUTH_WEST;
+                                break;
+
+                            case Gorilla::SOUTH:
+                                InFront = TileDirection != Gorilla::NORTH
+                                          && TileDirection != Gorilla::NORTH_WEST
+                                          && TileDirection != Gorilla::NORTH_EAST;
+                                break;
+
+                            case Gorilla::SOUTH_WEST:
+                                InFront = TileDirection != Gorilla::SOUTH_EAST
+                                          && TileDirection != Gorilla::EAST
+                                          && TileDirection != Gorilla::NORTH_EAST
+                                          && TileDirection != Gorilla::NORTH
+                                          && TileDirection != Gorilla::NORTH_WEST;
+                                break;
+
+                            case Gorilla::WEST:
+                                InFront = TileDirection != Gorilla::NORTH_EAST
+                                          && TileDirection != Gorilla::EAST
+                                          && TileDirection != Gorilla::SOUTH_EAST;
+                                break;
+
+                            case Gorilla::NORTH_WEST:
+                                InFront = TileDirection != Gorilla::SOUTH_WEST
+                                          && TileDirection != Gorilla::SOUTH
+                                          && TileDirection != Gorilla::SOUTH_EAST
+                                          && TileDirection != Gorilla::EAST
+                                          && TileDirection != Gorilla::NORTH_EAST;
+                                break;
+
+                            default: break;
+                        }
+                        Tiles.emplace_back(std::make_pair(InFront, std::move(Next)));
                     }
                 }
             }
@@ -332,7 +360,14 @@ std::vector<std::pair<bool, Tile>> Gorillas::GetViableMoveTiles(double Distance)
 
 Tile Gorillas::GetMeleeMoveTile(double Distance)
 {
-    auto ViableTiles = Gorillas::GetViableMoveTiles(Distance);
+    auto ViableTiles = Gorillas::GetValidMoveTiles();
+    if (ViableTiles.empty()) return Tile();
+
+    
+
+
+    return Tile();
+/*    auto ViableTiles = Gorillas::GetViableMoveTiles(Distance);
     if (ViableTiles.empty()) return Tile();
 
     auto PlayerPos = Mainscreen::GetTrueLocation();
@@ -349,28 +384,60 @@ Tile Gorillas::GetMeleeMoveTile(double Distance)
         if (ViableTiles[0].first && ViableTiles[1].first && ViableTiles[0].second.DistanceFrom(ViableTiles[1].second) < 2.00)
             return UniformRandom() <= 0.35 ? ViableTiles[1].second : ViableTiles[0].second;
     }
-    return ViableTiles.front().second;
+    return ViableTiles.front().second;*/
 }
 
-Tile Gorillas::GetBoulderMoveTile()
+Tile Gorillas::GetMeleeBoulderMoveTile(double Distance)
 {
-    /*
-     * if we are equipped for melee, and the next traveling point will not be the boulder tile, then just click attack
-     *
-     *
-     *
-     */
-
-
-
-    auto ValidMovements = Gorillas::GetValidMovementAreas();
-    if (!ValidMovements.empty())
+    std::shared_ptr<Gorilla> CurrentGorilla = GameListener::GetCurrentGorilla();
+    if (CurrentGorilla && *CurrentGorilla)
     {
+        auto ValidMovements = Gorillas::GetValidMovementAreas();
 
-    } else
-    {
+        std::vector<WorldArea> BoulderAreas = GameListener::GetBoulderAreas();
+        std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(CurrentGorilla->GetIndex(), true);
+        for (const auto& ValidMovement : ValidMovements)
+        {
+            bool IntersectsWithBoulder = std::any_of(BoulderAreas.begin(), BoulderAreas.end(),
+                                                     [&ValidMovement](const WorldArea& A) -> bool
+                                                     { return A && ValidMovement.IntersectsWith(A); });
+            bool IntersectsWithGorilla = std::any_of(GorillaAreas.begin(), GorillaAreas.end(),
+                                                     [&ValidMovement](const WorldArea& A) -> bool
+                                                     { return A && ValidMovement.IntersectsWith(A); });
 
+            if (!IntersectsWithBoulder && !IntersectsWithGorilla)
+            {
+                auto GorillaArea = CurrentGorilla->GetWorldArea();
+                if (!ValidMovement.IntersectsWith(GorillaArea) && ValidMovement.IsInMeleeDistance(GorillaArea))
+                    return ValidMovement.AsTile();
+            }
+        }
+
+       /* std::function<bool(const Tile&)> MovementBlocked = [&](const Tile& T) -> bool
+        {
+            const auto Area1 = WorldArea(T, 1, 1);
+            if (!Area1) return true;
+
+            bool IntersectsWithBoulder = std::any_of(BoulderAreas.begin(), BoulderAreas.end(), [&Area1](const WorldArea& A) -> bool { return A && Area1.IntersectsWith(A); });
+            bool IntersectsWithGorilla = std::any_of(GorillaAreas.begin(), GorillaAreas.end(), [&Area1](const WorldArea& A) -> bool { return A && Area1.IntersectsWith(A); });
+
+            return !IntersectsWithBoulder && !IntersectsWithGorilla;
+        };
+
+        for (const auto& ValidMovement : ValidMovements)
+        {
+            auto NextTravelPoint = ValidMovement.CalculateNextTravellingPoint(CurrentGorilla->GetWorldArea(), true, MovementBlocked);
+            if (NextTravelPoint.CanMelee(CurrentGorilla->GetWorldArea()))
+                return ValidMovement.AsTile();
+        }*/
     }
+    return Tile();
+}
+
+Tile Gorillas::GetRangedBoulderMoveTile(double Distance)
+{
+    auto ValidMovements = Gorillas::GetValidMovementAreas();
+
     return Tile();
 }
 
@@ -449,13 +516,17 @@ bool Gorillas::Fight()
     if (State & Gorillas::BOULDER) Text += "BOULDER\n";
     Paint::DrawString(Text, Internal::TileToMainscreen(Minimap::GetPosition(), 0, 0, 0) + Point(20, 0), 0, 255, 255, 255);
 
-    if (State & MELEE_MOVE)
+    std::vector<WorldArea> BoulderAreas = GameListener::GetBoulderAreas();
+    std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), true);
+    std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas(true);
+
+/*    if (State & MELEE_MOVE)
     {
         //State = Gorillas::MeleeMove(State, Gorilla);
 
         static Tile MeleeMoveTile;
         std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas();
-        std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), true);
+        //std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), true);
 
         auto NextTravelingPoint = Gorilla->GetNextTravelingPoint(Mainscreen::GetTrueLocation(), GorillaAreas, PlayerAreas);
         auto NextTravelingTile = NextTravelingPoint.AsTile();
@@ -464,12 +535,24 @@ bool Gorillas::Fight()
         {
             if (!MeleeMoveTile)
                 MeleeMoveTile = Gorillas::GetMeleeMoveTile(1.00);
-            Paint::DrawDot(Internal::TileToMainscreen(MeleeMoveTile, 0, 0, 0), 2.5f, 0, 255, 0, 255);
+            Paint::DrawTile(MeleeMoveTile, 255, 255, 0, 255);
         } else
             MeleeMoveTile = Tile();
-    }
+    }*/
 
     Gorilla->Draw(true);
+
+    auto MoveTiles = Gorillas::GetValidMoveTiles();
+    for (const auto& T : MoveTiles)
+    {
+        Paint::DrawTile(T.second.AsTile(), T.first ? 0 : 255, T.first ? 255 : 0, 0, 255);
+        Paint::DrawString(std::to_string(T.second.DistanceTo(Gorilla->GetWorldArea())), Internal::TileToMainscreen(T.second.AsTile(), 0, 0, 0), 0, 255, 0, 255);
+    }
+
+    //auto NextPoint = WorldArea(Internal::GetLocalPlayer()).CalculateNextTravellingPoint(Gorilla->GetWorldArea(), true, MovementBlocked);
+    //if (NextPoint) Paint::DrawTile(NextPoint.AsTile(), 255, 255, 0, 255);
+    //Paint::DrawTile(GetMeleeBoulderMoveTile(1.00), 255, 0, 255, 255);
+
     return true;
 }
 
@@ -478,6 +561,9 @@ bool Gorillas::MeleeMove(std::int32_t& State, const std::shared_ptr<Gorilla>& Go
     Tile MeleeMoveTile;
     while (State & MELEE_MOVE)
     {
+        /*
+         * After clicking the move tile, sometimes open the prayer menu as if to be ready
+         */
         std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas();
         std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), true);
 
@@ -497,11 +583,22 @@ bool Gorillas::MeleeMove(std::int32_t& State, const std::shared_ptr<Gorilla>& Go
 
 bool Gorillas::BoulderMove(int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
 {
+    /*
+     * if we are equipped for melee, and the next traveling point will not be the boulder tile, then just click attack
+     * if we are equipped ranged, but we need to switch to melee, switch to melee after clicking to move, but we need to generate a tile that can path safely to melee range if possible
+     *      we could switch to melee before moving, and we should sometimes for sake of anti-bot
+     * if we are equipped ranged, and we don't need to switch to melee, randomly decide to generate a tile > 1 distance away from the gorilla, efficiently be ready for MELEE_MOVE
+     *      if we are already > 2 away, pick a tile within attack range, preferably in front of the gorilla (the ones with the lowest distance)
+     *
+     */
+
+
     while (State & MELEE_MOVE)
     {
 
     }
     //State = Gorillas::GetState();
+    return false;
 }
 
 bool Gorillas::Prayers(int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)

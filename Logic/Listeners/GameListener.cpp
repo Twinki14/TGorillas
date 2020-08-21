@@ -78,7 +78,6 @@ void GameListener::DrawGorillas()
                 if (State & Gorillas::SWITCH_PRAYER_MELEE) Text += "SWITCH_PRAYER_MELEE\n";
                 if (State & Gorillas::SWITCH_PRAYER_RANGED) Text += "SWITCH_PRAYER_RANGED\n";
                 if (State & Gorillas::SWITCH_PRAYER_MAGIC) Text += "SWITCH_PRAYER_MAGIC\n";
-                if (State & Gorillas::SINGLE_SWITCH_PRAYER) Text += "SINGLE_SWITCH_PRAYER\n";
                 if (State & Gorillas::MELEE_MOVE) Text += "MELEE_MOVE\n";
                 if (State & Gorillas::EQUIP_MELEE) Text += "EQUIP_MELEE\n";
                 if (State & Gorillas::EQUIP_RANGED) Text += "EQUIP_RANGED\n";

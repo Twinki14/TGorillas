@@ -58,17 +58,20 @@ public:
     std::int32_t DistanceTo2D(const WorldArea& Other) const;
 
     bool HasLineOfSightTo(const WorldArea& Other) const;
+    bool HasLineOfSightTo(const WorldArea& Other, const std::vector<std::vector<std::int32_t>>& CollisionFlags) const;
     Point GetComparisonPoint(const WorldArea& Other) const;
     Point GetAxisDistances(const WorldArea& Other) const;
     bool IsInMeleeDistance(const WorldArea& Other) const;
+    bool CanMelee(const WorldArea& Other) const;
     bool IntersectsWith(const WorldArea& Other) const;
     bool CanTravelInDirection(std::int32_t DirectionX, std::int32_t DirectionY) const;
     bool CanTravelInDirection(std::int32_t DirectionX, std::int32_t DirectionY, const std::function<bool(const Tile&)>& Pred) const;
-    WorldArea CalculateNextTravellingPoint(const WorldArea& Target, bool StopAtMeleeDistance);
-    WorldArea CalculateNextTravellingPoint(const WorldArea& Target, bool StopAtMeleeDistance, const std::function<bool(const Tile&)>& Pred);
+    WorldArea CalculateNextTravellingPoint(const WorldArea& Target, bool StopAtMeleeDistance) const;
+    WorldArea CalculateNextTravellingPoint(const WorldArea& Target, bool StopAtMeleeDistance, const std::function<bool(const Tile&)>& Pred) const;
 
     Tile AsTile() const;
     operator bool() const;
+    bool operator==(const WorldArea& W) const;
 
     ~WorldArea();
 private:

@@ -145,7 +145,6 @@ bool WorldArea::HasLineOfSightTo(const WorldArea& Other) const
     if (!*this || !Other) return false;
     if (Plane != Other.GetPlane()) return false;
     if (Internal::GetGameState() != 30) return false;
-    if (Plane != Internal::GetClientPlane()) return false;
 
     const auto CollisionData = Internal::GetCollisionMap(Plane);
     const auto CollisionFlags = CollisionData.GetFlags();
@@ -157,6 +156,8 @@ bool WorldArea::HasLineOfSightTo(const WorldArea& Other) const
 
     if (p1.X >= 104 || p1.Y >= 104) return false;
     if (p2.X >= 104 || p2.Y >= 104) return false;
+    if (p1.X < 0 || p1.Y < 0) return false;
+    if (p2.X < 0 || p2.Y < 0) return false;
 
     int dx = p2.X - p1.X;
     int dy = p2.Y - p1.Y;
@@ -190,7 +191,9 @@ bool WorldArea::HasLineOfSightTo(const WorldArea& Other) const
         {
             x += direction;
             int y = yBig >> 16;
+
             if (x >= 104 || y >= 104) return false;
+            if (x < 0 || y < 0) return false;
             if ((CollisionFlags[x][y] & xFlags) != 0)
             {
                 // Collision while traveling on the x axis
@@ -198,7 +201,9 @@ bool WorldArea::HasLineOfSightTo(const WorldArea& Other) const
             }
             yBig += slope;
             int nextY = yBig >> 16;
-            if (x >= 104 || nextY >= 104) return false;
+
+            if (x >= 104 || y >= 104) return false;
+            if (x < 0 || y < 0) return false;
             if (nextY != y && (CollisionFlags[x][nextY] & yFlags) != 0)
             {
                 // Collision while traveling on the y axis
@@ -221,7 +226,9 @@ bool WorldArea::HasLineOfSightTo(const WorldArea& Other) const
         {
             y += direction;
             int x = xBig >> 16;
+
             if (x >= 104 || y >= 104) return false;
+            if (x < 0 || y < 0) return false;
             if ((CollisionFlags[x][y] & yFlags) != 0)
             {
                 // Collision while traveling on the y axis
@@ -230,7 +237,118 @@ bool WorldArea::HasLineOfSightTo(const WorldArea& Other) const
 
             xBig += slope;
             int nextX = xBig >> 16;
-            if (nextX >= 104 || y >= 104) return false;
+
+            if (x >= 104 || y >= 104) return false;
+            if (x < 0 || y < 0) return false;
+            if (nextX != x && (CollisionFlags[nextX][y] & xFlags) != 0)
+            {
+                // Collision while traveling on the x axis
+                return false;
+            }
+        }
+    }
+
+    // No collision
+    return true;
+}
+
+bool WorldArea::HasLineOfSightTo(const WorldArea& Other, const std::vector<std::vector<std::int32_t>>& CollisionFlags) const
+{
+    if (!*this || !Other) return false;
+    if (Plane != Other.GetPlane()) return false;
+    if (Internal::GetGameState() != 30) return false;
+    if (CollisionFlags.empty()) return false;
+
+    const Point p1 = Point(this->GetSceneX(), this->GetSceneY());
+    const Point p2 = Point(Other.GetSceneX(), Other.GetSceneY());
+    if (p1 == p2) return true;
+
+    if (p1.X >= 104 || p1.Y >= 104) return false;
+    if (p2.X >= 104 || p2.Y >= 104) return false;
+    if (p1.X < 0 || p1.Y < 0) return false;
+    if (p2.X < 0 || p2.Y < 0) return false;
+
+    int dx = p2.X - p1.X;
+    int dy = p2.Y - p1.Y;
+    int dxAbs = std::abs(dx);
+    int dyAbs = std::abs(dy);
+
+    int xFlags = BLOCK_LINE_OF_SIGHT_FULL;
+    int yFlags = BLOCK_LINE_OF_SIGHT_FULL;
+
+    if (dx < 0)
+        xFlags |= BLOCK_LINE_OF_SIGHT_EAST;
+    else
+        xFlags |= BLOCK_LINE_OF_SIGHT_WEST;
+
+    if (dy < 0)
+        yFlags |= BLOCK_LINE_OF_SIGHT_NORTH;
+    else
+        yFlags |= BLOCK_LINE_OF_SIGHT_SOUTH;
+
+    if (dxAbs > dyAbs)
+    {
+        int x = p1.X;
+        int yBig = p1.Y << 16; // The y position is represented as a bigger number to handle rounding
+        int slope = (dy << 16) / dxAbs;
+        yBig += 0x8000; // Add half of a tile
+        if (dy < 0)
+            yBig--; // For correct rounding
+        int direction = dx < 0 ? -1 : 1;
+
+        while (x != p2.X)
+        {
+            x += direction;
+            int y = yBig >> 16;
+
+            if (x >= 104 || y >= 104) return false;
+            if (x < 0 || y < 0) return false;
+            if ((CollisionFlags[x][y] & xFlags) != 0)
+            {
+                // Collision while traveling on the x axis
+                return false;
+            }
+            yBig += slope;
+            int nextY = yBig >> 16;
+
+            if (x >= 104 || y >= 104) return false;
+            if (x < 0 || y < 0) return false;
+            if (nextY != y && (CollisionFlags[x][nextY] & yFlags) != 0)
+            {
+                // Collision while traveling on the y axis
+                return false;
+            }
+        }
+    } else
+    {
+        int y = p1.Y;
+        int xBig = p1.X << 16; // The x position is represented as a bigger number to handle rounding
+        int slope = (dx << 16) / dyAbs;
+        xBig += 0x8000; // Add half of a tile
+        if (dx < 0)
+        {
+            xBig--; // For correct rounding
+        }
+        int direction = dy < 0 ? -1 : 1;
+
+        while (y != p2.Y)
+        {
+            y += direction;
+            int x = xBig >> 16;
+
+            if (x >= 104 || y >= 104) return false;
+            if (x < 0 || y < 0) return false;
+            if ((CollisionFlags[x][y] & yFlags) != 0)
+            {
+                // Collision while traveling on the y axis
+                return false;
+            }
+
+            xBig += slope;
+            int nextX = xBig >> 16;
+
+            if (x >= 104 || y >= 104) return false;
+            if (x < 0 || y < 0) return false;
             if (nextX != x && (CollisionFlags[nextX][y] & xFlags) != 0)
             {
                 // Collision while traveling on the x axis
@@ -245,22 +363,23 @@ bool WorldArea::HasLineOfSightTo(const WorldArea& Other) const
 
 Point WorldArea::GetComparisonPoint(const WorldArea& Other) const
 {
-    int x, y;
+    Point P(0, 0);
+
+    //int x, y;
     if (Other.GetX() <= X)
-        x = X;
-    else if (Other.GetX() >= X + Width - 1)
-        x = X + Width - 1;
+        P.X = X;
+    else if (Other.GetX() >= (X + Width - 1))
+        P.X = (X + Width - 1);
     else
-        x = Other.GetX();
+        P.X = Other.GetX();
 
     if (Other.GetY() <= Y)
-        y = Y;
-    else if (Other.GetY() >= Y + Height - 1)
-        y = Y + Height - 1;
+        P.Y = Y;
+    else if (Other.GetY() >= (Y + Height - 1))
+        P.Y = (Y + Height - 1);
     else
-        y = Other.GetY();
-
-    return Point(x, y);
+        P.Y = Other.GetY();
+    return P;
 }
 
 Point WorldArea::GetAxisDistances(const WorldArea& Other) const
@@ -277,6 +396,18 @@ bool WorldArea::IsInMeleeDistance(const WorldArea& Other) const
 
     Point distances = GetAxisDistances(Other);
     return (distances.X + distances.Y) == 1;
+}
+
+bool WorldArea::CanMelee(const WorldArea& Other) const
+{
+    if (this->IsInMeleeDistance(Other))
+    {
+        Point p1 = this->GetComparisonPoint(Other);
+        Point p2 = Other.GetComparisonPoint(*this);
+        WorldArea w1(Tile(p1.X, p1.Y, this->Plane), 1, 1);
+        return w1.CanTravelInDirection(p2.X - p1.X, p2.Y - p1.Y);
+    }
+    return false;
 }
 
 bool WorldArea::IntersectsWith(const WorldArea& Other) const
@@ -425,12 +556,12 @@ bool WorldArea::CanTravelInDirection(std::int32_t DirectionX, std::int32_t Direc
     return true;
 }
 
-WorldArea WorldArea::CalculateNextTravellingPoint(const WorldArea& Target, bool StopAtMeleeDistance)
+WorldArea WorldArea::CalculateNextTravellingPoint(const WorldArea& Target, bool StopAtMeleeDistance) const
 {
     return CalculateNextTravellingPoint(Target, StopAtMeleeDistance, [](const Tile& T) -> bool { return true; });
 }
 
-WorldArea WorldArea::CalculateNextTravellingPoint(const WorldArea& Target, bool StopAtMeleeDistance, const std::function<bool(const Tile&)>& Pred)
+WorldArea WorldArea::CalculateNextTravellingPoint(const WorldArea& Target, bool StopAtMeleeDistance, const std::function<bool(const Tile&)>& Pred) const
 {
     if (Plane != Target.GetPlane()) return WorldArea();
 
@@ -480,6 +611,11 @@ Tile WorldArea::AsTile() const
 WorldArea::operator bool() const
 {
     return !(X < 0 || Y < 0 || SceneX < 0 || SceneY < 0 || Plane < 0);
+}
+
+bool WorldArea::operator==(const WorldArea& W) const
+{
+    return this->X == W.GetX() && this->Y == W.GetY() && this->Plane == W.GetPlane();
 }
 
 WorldArea::~WorldArea()

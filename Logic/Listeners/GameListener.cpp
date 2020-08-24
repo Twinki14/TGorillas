@@ -15,80 +15,11 @@ GameListener& GameListener::Instance()
 
 void GameListener::DrawGorillas()
 {
-    Gorillas::Fight();
-    return;
-
-    /*if (GameListener::CurrentGorilla && *GameListener::CurrentGorilla)
-    {
-        auto Tiles = Gorillas::GetViableMoveTiles();
-        for (const auto& [InFront, Tile] : Tiles)
-            Paint::DrawDot(Internal::TileToMainscreen(Tile, 0, 0, 0), 1.2f, InFront ? 0 : 255, InFront ? 255 : 0, 0, 255);
-
-        auto Interacting = GameListener::CurrentGorilla->GetInteractingPlayer();
-        auto Target = GameListener::GetPlayer(Interacting);
-
-        WorldArea NextArea;
-        if (Target && *Target && *Target->GetLastWorldArea() && *GameListener::CurrentGorilla->GetLastWorldArea())
-        {
-            std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas();
-            std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(GameListener::CurrentGorilla->GetIndex(), true);
-            NextArea = GameListener::CurrentGorilla->GetNextTravelingPoint(*Target->GetLastWorldArea(), GorillaAreas, PlayerAreas);
-
-            auto State = Gorillas::GetState();
-
-            std::string Text;
-            if (State & Gorillas::SWITCH_PRAYER_MELEE) Text += "SWITCH_PRAYER_MELEE\n";
-            if (State & Gorillas::SWITCH_PRAYER_RANGED) Text += "SWITCH_PRAYER_RANGED\n";
-            if (State & Gorillas::SWITCH_PRAYER_MAGIC) Text += "SWITCH_PRAYER_MAGIC\n";
-            //if (State & Gorillas::SINGLE_SWITCH_PRAYER) Text += "SINGLE_SWITCH_PRAYER\n";
-            if (State & Gorillas::MELEE_MOVE) Text += "MELEE_MOVE\n";
-            if (State & Gorillas::EQUIP_MELEE) Text += "EQUIP_MELEE\n";
-            if (State & Gorillas::EQUIP_RANGED) Text += "EQUIP_RANGED\n";
-            if (State & Gorillas::EQUIP_SPECIAL) Text += "EQUIP_SPECIAL\n";
-            if (State & Gorillas::BOULDER) Text += "BOULDER\n";
-            Paint::DrawString(Text, Internal::TileToMainscreen(Target->GetTile(), 0, 0, 0) + Point(20, 0), 0, 255, 255, 255);
-        }
-
-        CurrentGorilla->Draw(true, NextArea);
-    }*/
-    return;
-
-
     std::shared_lock Lock(GorillasLock);
     for (auto [Index, Gorilla] : GameListener::TrackedGorillas)
     {
         if (!Gorilla) continue;
-
-        if (GameListener::CurrentGorilla && GameListener::CurrentGorilla->GetIndex() == Index)
-        {
-            auto Interacting = Gorilla->GetInteractingPlayer();
-            auto Target = GameListener::GetPlayer(Interacting);
-
-            WorldArea NextArea;
-            if (Target && *Target && *Target->GetLastWorldArea() && *Gorilla->GetLastWorldArea())
-            {
-                std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), false);
-                std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas();
-                NextArea = Gorilla->GetNextTravelingPoint(Target->GetWorldArea(), GorillaAreas, PlayerAreas);
-
-                auto State = Gorillas::GetState();
-
-                std::string Text;
-
-                if (State & Gorillas::SWITCH_PRAYER_MELEE) Text += "SWITCH_PRAYER_MELEE\n";
-                if (State & Gorillas::SWITCH_PRAYER_RANGED) Text += "SWITCH_PRAYER_RANGED\n";
-                if (State & Gorillas::SWITCH_PRAYER_MAGIC) Text += "SWITCH_PRAYER_MAGIC\n";
-                if (State & Gorillas::MELEE_MOVE) Text += "MELEE_MOVE\n";
-                if (State & Gorillas::EQUIP_MELEE) Text += "EQUIP_MELEE\n";
-                if (State & Gorillas::EQUIP_RANGED) Text += "EQUIP_RANGED\n";
-                if (State & Gorillas::EQUIP_SPECIAL) Text += "EQUIP_SPECIAL\n";
-                Paint::DrawString(Text, Internal::TileToMainscreen(Target->GetTile(), 0, 0, 0) + Point(20, 0), 0, 255, 255, 255);
-            }
-
-            Gorilla->Draw(true, NextArea);
-
-        } //else
-            //Gorilla->Draw();
+        Gorilla->Draw(false);
     }
 }
 
@@ -418,9 +349,10 @@ void GameListener::CheckGorillaAttacks()
     for (auto [Index, Gorilla] : GameListener::TrackedGorillas)
     {
         Internal::Player Interacting = Gorilla->GetInteractingPlayer();
+        auto InteractIndex = Gorilla->GetInteractIndex();
         auto Target = GameListener::GetPlayer(Interacting);
 
-        if (Gorilla->LastTickInteractingIndex != -1 && !Interacting) // No longer in combat
+        if (Gorilla->LastTickInteractingIndex != -1 && InteractIndex < 0) // No longer in combat
         {
             Gorilla->InitiatedCombat = false;
         } else if (Target && *Target && *Target->GetLastWorldArea() && !Gorilla->InitiatedCombat
@@ -622,7 +554,7 @@ void GameListener::CheckGorillaAttacks()
 
         Gorilla->LastTickAnimation = Gorilla->GetAnimationID();
         Gorilla->SetLastWorldArea(std::move(Area));
-        Gorilla->LastTickInteractingIndex = Gorilla->GetInteractIndex();
+        Gorilla->LastTickInteractingIndex = InteractIndex;
         Gorilla->RecentlyTookDamage = false;
         Gorilla->ChangedPrayerThisTick = false;
         Gorilla->ChangedAttackStyleLastTick = Gorilla->ChangedAttackStyleThisTick ? true : false;
@@ -782,7 +714,9 @@ void GameListener::OnNPCUpdate(std::vector<Internal::NPC>& NPCs, std::vector<std
         for (std::uint32_t I = 0; I < NPCs.size(); I++)
         {
             Interactable::NPC N = NPCs[I];
-            if (!N || !IsGorilla(N.GetID())) continue;
+            if (!N || !GameListener::IsGorilla(N.GetID())
+                   || !Globals::AREA_CRASH_SITE_CAVERN_INNER.Contains(N.GetTile()))
+                continue;
 
             std::shared_ptr<Gorilla> Tracked = GameListener::GetGorilla(NPCIndices[I]);
             if (!Tracked || N != *Tracked)
@@ -1175,8 +1109,14 @@ std::vector<WorldArea> GameListener::GetBoulderAreas()
     return Result;
 }
 
+std::uint32_t GameListener::GetTickCount()
+{
+    return TickCount;
+}
 
 GameListener::GameListener() : LoopTask("GameListener", std::chrono::milliseconds(20), GameListener::Loop)
 {
 
 }
+
+

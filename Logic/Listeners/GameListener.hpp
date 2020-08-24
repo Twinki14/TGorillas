@@ -35,6 +35,8 @@ public:
     static std::vector<WorldArea> GetGorillaAreas(std::int32_t Index, bool Lock = true);
     static std::vector<WorldArea> GetBoulderAreas();
 
+    static std::uint32_t GetTickCount();
+
 private:
 
     static bool IsGorilla(std::int32_t ID);

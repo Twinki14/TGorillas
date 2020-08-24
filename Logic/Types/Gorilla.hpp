@@ -37,12 +37,12 @@ namespace Globals::Gorillas
     constexpr int DEMONIC_GORILLA_MAGE_7149     = 7149; // MAGE
 
     constexpr int ANIMATION_DYING = 7229;
+    constexpr int ANIMATION_DEFEND = 7224;
     constexpr int ANIMATION_MAGIC_ATTACK = 7225;
     constexpr int ANIMATION_MELEE_ATTACK = 7226;
     constexpr int ANIMATION_RANGED_ATTACK = 7227;
     constexpr int ANIMATION_AOE_ATTACK = 7228;
     constexpr int ANIMATION_PRAYER_SWITCH = 7228;
-    constexpr int ANIMATION_DEFEND = 7224;
 
     constexpr int PROJECTILE_RANGED = 1302;
     constexpr int PROJECTILE_MAGIC = 1304;
@@ -86,6 +86,7 @@ public:
     WorldArea GetWorldArea() const;
     WorldArea GetNextTravelingPoint(const WorldArea& TargetArea, const std::vector<WorldArea>& Gorillas, const std::vector<WorldArea>& Players) const;
     bool IsDead() const;
+    bool InCombat() const;
     bool HealthBarShowing() const;
 
     void SetLastWorldArea(std::shared_ptr<WorldArea> Area);

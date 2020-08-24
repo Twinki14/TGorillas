@@ -11,6 +11,7 @@
 #include "Logic/Gorillas.hpp"
 #include "Logic/Listeners/GameListener.hpp"
 #include "Logic/Types/WorldArea.hpp"
+#include "Logic/Travel.hpp"
 
 void Setup()
 {
@@ -65,16 +66,19 @@ bool OnStart()
 
 bool Loop()
 {
-    GameListener::Instance().Start();
-    Wait(500);
-    return true;
-
     if (Mainscreen::IsLoggedIn())
     {
         if (BreakHandler::Break())
         {
             Script::ResumeTimer();
             return true;
+        }
+
+        if (Travel::GetLocation() == Travel::CRASH_SITE_CAVERN_INNER)
+            Gorillas::Fight();
+        else
+        {
+            GameListener::Instance().Stop(true);
         }
 
         return true;
@@ -85,6 +89,7 @@ bool Loop()
 bool OnBreak()
 {
     Script::PauseTimer();
+    GameListener::Instance().Stop(true);
     Script::SetStatus("Breaking");
     return false;
 }

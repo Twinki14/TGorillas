@@ -9,6 +9,7 @@
 #include <Game/Tools/Pathfinding.hpp>
 #include <Tools/OSRSBox/Items.hpp>
 #include <Game/Interfaces/GameTabs/Equipment.hpp>
+#include <Game/Core.hpp>
 #include "Gorillas.hpp"
 #include "Travel.hpp"
 #include "Listeners/GameListener.hpp"
@@ -17,9 +18,8 @@
 std::int32_t Gorillas::GetState()
 {
     auto Gorilla = GameListener::GetCurrentGorilla();
-    auto Player = Players::GetLocal();
 
-    if (!Player || !Gorilla || !*Gorilla || Gorilla->IsDead())
+    if (!Gorilla || !*Gorilla || Gorilla->IsDead())
         return 0;
 
     std::int32_t State = 0;
@@ -461,6 +461,61 @@ Tile Gorillas::GetRangedBoulderMoveTile(double Distance)
     return Tile();
 }
 
+bool Gorillas::IsAttacking()
+{
+    auto Gorilla = GameListener::GetCurrentGorilla();
+    auto Player = Players::GetLocal();
+    if (!Gorilla || !*Gorilla || !Player) return false;
+
+    auto Interacting = Player.GetInteracting();
+    if (!Interacting) return false;
+
+    auto Interacting_NPC = ((Interacting && Interacting.InstanceOf(Internal::NPC::GetClass())) ? (Internal::NPC((Internal::Object) Interacting)) : (Internal::NPC(nullptr)));
+    if (!Interacting_NPC) return false;
+
+    auto Interacting_Interactable = Interactable::NPC(Interacting_NPC);
+    auto InteractableGorilla = Interactable::NPC(*Gorilla);
+    return Interacting_Interactable && Interacting_Interactable == InteractableGorilla;
+}
+
+bool Gorillas::ShouldLeave()
+{
+    return false;
+}
+
+bool Gorillas::AdjustCamera()
+{
+    // TODO
+    return false;
+}
+
+bool Gorillas::Attack(bool Force, bool Wait)
+{
+    if (Force || !Gorillas::IsAttacking())
+    {
+        auto Gorilla = GameListener::GetCurrentGorilla();
+        if (!Gorilla || !*Gorilla) return false;
+
+        if (Gorilla->IsDead()) return false;
+        //if (!Force && Vorkath::GetTimeSinceLastAttack() < 1600) return false;
+
+        Script::SetStatus("Attacking");
+        Profile::Push(Profile::Var_RawMoveMean, 40);
+        Profile::Push(Profile::Var_RawMoveDeviation, 0.01);
+        Profile::Push(Profile::Var_RawMouseDownMean, 35);
+        Profile::Push(Profile::Var_RawMouseDownDeviation, 0.01);
+        Profile::Push(Profile::Var_RawMouseUpMean, 0);
+        const auto GorillaPoint = Gorilla->GetConvex().GetMiddle();
+        bool Result = Interact::Click(GorillaPoint, "Attack");
+        Profile::Pop(5);
+
+        if (!Result) Gorillas::AdjustCamera();
+        if (Wait) return Result && WaitFunc(450, 25, Gorillas::IsAttacking, true);
+        return Result;
+    }
+    return false;
+}
+
 bool Gorillas::SwitchPrayer(Prayer::PRAYERS Prayer)
 {
     if (Prayer::IsActive(Prayer)) return true;
@@ -504,114 +559,6 @@ bool Gorillas::SwitchPrayer(Prayer::PRAYERS Prayer)
     }
 
     return false;
-}
-
-bool Gorillas::WalkTo()
-{
-    if (!Travel::InCavern()) return false;
-    if (Travel::GetLocation() == Travel::CRASH_SITE_CAVERN_INNER) return true;
-
-
-    return true;
-}
-
-bool Gorillas::Fight()
-{
-    if (Travel::GetLocation() != Travel::CRASH_SITE_CAVERN_INNER) return false;
-
-    std::shared_ptr<Gorilla> Gorilla = GameListener::GetCurrentGorilla();
-    if (!Gorilla || !*Gorilla) return false;
-
-    std::string Text;
-    std::int32_t State = Gorillas::GetState();
-
-    if (State & Gorillas::SWITCH_PRAYER_MELEE) Text += "SWITCH_PRAYER_MELEE\n";
-    if (State & Gorillas::SWITCH_PRAYER_RANGED) Text += "SWITCH_PRAYER_RANGED\n";
-    if (State & Gorillas::SWITCH_PRAYER_MAGIC) Text += "SWITCH_PRAYER_MAGIC\n";
-    //if (State & Gorillas::SINGLE_SWITCH_PRAYER) Text += "SINGLE_SWITCH_PRAYER\n";
-    if (State & Gorillas::EQUIP_MELEE) Text += "EQUIP_MELEE\n";
-    if (State & Gorillas::MELEE_MOVE) Text += "MELEE_MOVE\n";
-    if (State & Gorillas::EQUIP_RANGED) Text += "EQUIP_RANGED\n";
-    if (State & Gorillas::EQUIP_SPECIAL) Text += "EQUIP_SPECIAL\n";
-    if (State & Gorillas::BOULDER) Text += "BOULDER\n";
-    Paint::DrawString(Text, Internal::TileToMainscreen(Minimap::GetPosition(), 0, 0, 0) + Point(20, 0), 0, 255, 255, 255);
-
-    std::vector<WorldArea> BoulderAreas = GameListener::GetBoulderAreas();
-    std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), true);
-    std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas(true);
-
-    if (State & MELEE_MOVE)
-    {
-        /*auto ViableTiles = Gorillas::GetValidMoveTiles();
-        if (!ViableTiles.empty())
-        {
-            auto PlayerArea = WorldArea(Internal::GetLocalPlayer());
-            auto GorillaArea = Gorilla->GetWorldArea();
-
-            std::int32_t MinPlayerDistance = 2;
-            std::int32_t MinGorillaDistance = 3;
-
-            auto Sort = [&](const std::pair<bool, WorldArea>& A, const std::pair<bool, WorldArea>& B) -> bool
-            {
-                if (A.first == B.first)
-                    return Mainscreen::GetProjectedDistance(A.second.AsTile(), PlayerArea.AsTile()) < Mainscreen::GetProjectedDistance(B.second.AsTile(), PlayerArea.AsTile());
-                return A.first && !B.first;
-            };
-
-            std::sort(ViableTiles.begin(), ViableTiles.end(), Sort);
-            for (std::uint32_t I = 0; I < ViableTiles.size(); I++)
-            {
-                std::string TextStr = std::to_string(ViableTiles[I].second.DistanceTo(PlayerArea)) + " | " + std::to_string(ViableTiles[I].second.DistanceTo(GorillaArea))
-                                                                                                                            + "\n[" + std::to_string(I) + "]";
-                Paint::DrawTile(ViableTiles[I].second.AsTile(), ViableTiles[I].first ? 0 : 255, ViableTiles[I].first ? 255 : 0, 0, 255);
-                Paint::DrawString(TextStr, Internal::TileToMainscreen(ViableTiles[I].second.AsTile(), 0, 0, 0), 0, 255, 255, 255);
-            }
-        }*/
-
-
-        static Tile MeleeMoveTile;
-
-        auto NextTravelingPoint = Gorilla->GetNextTravelingPoint(Mainscreen::GetTrueLocation(), GorillaAreas, PlayerAreas);
-        auto NextTravelingTile = NextTravelingPoint.AsTile();
-
-        if (!NextTravelingTile || NextTravelingTile.DistanceFrom(Gorilla->GetTrueLocation()) == 0.00)
-        {
-            if (!MeleeMoveTile)
-                MeleeMoveTile = Gorillas::GetMeleeMoveTile(1.00);
-            Paint::DrawTile(MeleeMoveTile, 0, 255, 0, 255);
-        } else
-            MeleeMoveTile = Tile();
-    }
-
-    static Tile BoulderMeleeMoveTile;
-    if (State & BOULDER)
-    {
-        if (!BoulderMeleeMoveTile)
-            BoulderMeleeMoveTile = Gorillas::GetMeleeBoulderMoveTile(1.00);
-        Paint::DrawTile(BoulderMeleeMoveTile, 255, 255, 0, 255);
-    } else
-        BoulderMeleeMoveTile = Tile();
-
-    Gorilla->Draw(true);
-
-/*    auto MoveTiles = Gorillas::GetValidMoveTiles();
-    for (const auto& T : MoveTiles)
-    {
-        Paint::DrawTile(T.second.AsTile(), T.first ? 0 : 255, T.first ? 255 : 0, 0, 255);
-        Paint::DrawString(std::to_string(T.second.DistanceTo(WorldArea(Internal::GetLocalPlayer()))) + " | " +
-                            std::to_string(T.second.DistanceTo(Gorilla->GetWorldArea())),
-                          Internal::TileToMainscreen(T.second.AsTile(), 0, 0, 0), 0, 255, 0, 255);
-    }*/
-
-    auto NextPoint = WorldArea(Internal::GetLocalPlayer()).CalculateNextTravellingPoint(Gorilla->GetWorldArea(), true);
-    if (NextPoint) Paint::DrawTile(NextPoint.AsTile(), 255, 0, 255, 255);
-    //Paint::DrawTile(GetMeleeBoulderMoveTile(1.00), 255, 0, 255, 255);
-
-/*    auto ViableTiles = Gorillas::GetValidMoveTiles();
-    for (const auto& [Front, T] : ViableTiles )
-        Paint::DrawTile(T.AsTile(), Front ? 0 : 255, Front ? 255 : 0, 0, 255);*/
-
-    return true;
 }
 
 bool Gorillas::MeleeMove(std::int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
@@ -689,4 +636,37 @@ bool Gorillas::Prayers(int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
         }
     }
     return false;
+}
+
+bool Gorillas::WalkTo()
+{
+    if (!Travel::InCavern()) return false;
+    if (Travel::GetLocation() == Travel::CRASH_SITE_CAVERN_INNER) return true;
+
+
+    return true;
+}
+
+bool Gorillas::Fight()
+{
+    GameListener::Instance().Start();
+    while (Travel::GetLocation() == Travel::CRASH_SITE_CAVERN_INNER)
+    {
+        if (Terminate) break;
+
+        std::int32_t State = Gorillas::GetState();
+        std::shared_ptr<Gorilla> Gorilla = GameListener::GetCurrentGorilla();
+        if (!Gorilla || !*Gorilla) break;
+
+        if (Gorilla->IsDead()) continue;
+
+
+        if (State & )
+
+
+
+
+    }
+    GameListener::Instance().Stop(true);
+    return true;
 }

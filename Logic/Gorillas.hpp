@@ -42,15 +42,19 @@ namespace Gorillas
     Tile GetMeleeMoveTile(double Distance);
     Tile GetMeleeBoulderMoveTile(double Distance);
     Tile GetRangedBoulderMoveTile(double Distance);
+    bool IsAttacking();
+    bool ShouldLeave();
 
+    bool AdjustCamera();
+    bool Attack(bool Force, bool Wait = false);
     bool SwitchPrayer(Prayer::PRAYERS Prayer);
-
-    bool WalkTo();
-    bool Fight();
 
     bool MeleeMove(std::int32_t& State, const std::shared_ptr<Gorilla>& CurrentGorilla);
     bool BoulderMove(std::int32_t& State, const std::shared_ptr<Gorilla>& CurrentGorilla);
     bool Prayers(std::int32_t& State, const std::shared_ptr<Gorilla>& CurrentGorilla);
+
+    bool WalkTo();
+    bool Fight();
 
     void OnGameTick();
 }

@@ -112,6 +112,14 @@ bool Gorilla::IsDead() const
     return this->LastHealthPercentage == 0.00 || Internal::GetHealthPercentage(*this) == 0.00 || this->GetAnimationID() == Globals::Gorillas::ANIMATION_DYING;
 }
 
+bool Gorilla::InCombat() const
+{
+    auto AnimationID = this->GetAnimationID();
+    return this->InitiatedCombat && (
+            (this->NextAttackTick > GameListener::GetTickCount())
+            || (AnimationID >= Globals::Gorillas::ANIMATION_DEFEND && AnimationID <= Globals::Gorillas::ANIMATION_AOE_ATTACK));
+}
+
 bool Gorilla::HealthBarShowing() const
 {
     return Internal::GetHealthPercentage(*this) != -1.00;
@@ -186,6 +194,6 @@ void Gorilla::Draw(bool Emphasize, const WorldArea& NextTravelingPoint) const
     if (this->NextPossibleAttackStyles & BOULDER_FLAG) StyleStr += "BOULDER ";
     StyleStr += "(" + std::to_string(this->CountNextPossibleAttackStyles()) + ")";
     Point Text = Internal::TileToMainscreen(this->GetTile(), 0, 0, 0) - Point(0, 25);
-    Paint::DrawString(std::to_string(this->GetIndex()) + " | " + std::to_string(this->DisabledMeleeMovementTicks) + " | " + StyleStr, Text, IndexColor.Red, IndexColor.Green, IndexColor.Blue, IndexColor.Alpha); Text.Y += 20;
+    Paint::DrawString(std::to_string(this->GetIndex()) + " | " + std::to_string(this->InCombat()) + " | " + StyleStr, Text, IndexColor.Red, IndexColor.Green, IndexColor.Blue, IndexColor.Alpha); Text.Y += 20;
     //Paint::DrawString(StyleStr, Text, StyleColor.Red, StyleColor.Green, StyleColor.Blue, StyleColor.Alpha); Text.Y += 20;
 }

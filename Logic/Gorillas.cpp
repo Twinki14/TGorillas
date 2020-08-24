@@ -295,11 +295,9 @@ std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles()
                                 break;
 
                             case Gorilla::NORTH_EAST:
-                                InFront = TileDirection != Gorilla::NORTH_WEST
-                                          && TileDirection != Gorilla::WEST
+                                InFront = TileDirection != Gorilla::WEST
                                           && TileDirection != Gorilla::SOUTH_WEST
-                                          && TileDirection != Gorilla::SOUTH
-                                          && TileDirection != Gorilla::SOUTH_EAST;
+                                          && TileDirection != Gorilla::SOUTH;
                                 break;
 
                             case Gorilla::EAST:
@@ -309,11 +307,9 @@ std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles()
                                 break;
 
                             case Gorilla::SOUTH_EAST:
-                                InFront = TileDirection != Gorilla::NORTH_EAST
-                                          && TileDirection != Gorilla::NORTH
+                                InFront = TileDirection != Gorilla::NORTH
                                           && TileDirection != Gorilla::NORTH_WEST
-                                          && TileDirection != Gorilla::WEST
-                                          && TileDirection != Gorilla::SOUTH_WEST;
+                                          && TileDirection != Gorilla::WEST;
                                 break;
 
                             case Gorilla::SOUTH:
@@ -323,11 +319,9 @@ std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles()
                                 break;
 
                             case Gorilla::SOUTH_WEST:
-                                InFront = TileDirection != Gorilla::SOUTH_EAST
-                                          && TileDirection != Gorilla::EAST
+                                InFront = TileDirection != Gorilla::EAST
                                           && TileDirection != Gorilla::NORTH_EAST
-                                          && TileDirection != Gorilla::NORTH
-                                          && TileDirection != Gorilla::NORTH_WEST;
+                                          && TileDirection != Gorilla::NORTH;
                                 break;
 
                             case Gorilla::WEST:
@@ -337,11 +331,9 @@ std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles()
                                 break;
 
                             case Gorilla::NORTH_WEST:
-                                InFront = TileDirection != Gorilla::SOUTH_WEST
-                                          && TileDirection != Gorilla::SOUTH
+                                InFront = TileDirection != Gorilla::SOUTH
                                           && TileDirection != Gorilla::SOUTH_EAST
-                                          && TileDirection != Gorilla::EAST
-                                          && TileDirection != Gorilla::NORTH_EAST;
+                                          && TileDirection != Gorilla::EAST;
                                 break;
 
                             default: break;
@@ -525,7 +517,7 @@ bool Gorillas::WalkTo()
 
 bool Gorillas::Fight()
 {
-    //if (Travel::GetLocation() != Travel::CRASH_SITE_CAVERN_INNER) return false;
+    if (Travel::GetLocation() != Travel::CRASH_SITE_CAVERN_INNER) return false;
 
     std::shared_ptr<Gorilla> Gorilla = GameListener::GetCurrentGorilla();
     if (!Gorilla || !*Gorilla) return false;
@@ -615,9 +607,9 @@ bool Gorillas::Fight()
     if (NextPoint) Paint::DrawTile(NextPoint.AsTile(), 255, 0, 255, 255);
     //Paint::DrawTile(GetMeleeBoulderMoveTile(1.00), 255, 0, 255, 255);
 
-    auto ViableTiles = Gorillas::GetValidMoveTiles();
+/*    auto ViableTiles = Gorillas::GetValidMoveTiles();
     for (const auto& [Front, T] : ViableTiles )
-        Paint::DrawTile(T.AsTile(), Front ? 0 : 255, Front ? 255 : 0, 0, 255);
+        Paint::DrawTile(T.AsTile(), Front ? 0 : 255, Front ? 255 : 0, 0, 255);*/
 
     return true;
 }

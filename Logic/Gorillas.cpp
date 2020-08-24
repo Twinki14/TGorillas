@@ -196,8 +196,6 @@ std::vector<WorldArea> Gorillas::GetValidMovementAreas()
 
 std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles()
 {
-    Timer T;
-
     std::vector<std::pair<bool, WorldArea>> Tiles;
     std::shared_ptr<Gorilla> CurrentGorilla = GameListener::GetCurrentGorilla();
     if (!CurrentGorilla || !*CurrentGorilla) return Tiles;
@@ -268,7 +266,7 @@ std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles()
             { return P.IntersectsWith(Next); }))
                 continue;
 
-            if (Area.DistanceTo(Next) <= Globals::Gorillas::MAX_ATTACK_RANGE && Area.HasLineOfSightTo(Next, ModifiedCollisionFlags))
+            if (Area.DistanceTo(Next) < Globals::Gorillas::MAX_ATTACK_RANGE && Area.HasLineOfSightTo(Next, ModifiedCollisionFlags))
             {
                 auto PredictedNewArea = CurrentGorilla->GetNextTravelingPoint(Next, GorillaAreas, PlayerAreas);
                 if (PredictedNewArea)
@@ -354,7 +352,6 @@ std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles()
             }
         }
     }
-    DebugLog("{}ms", T.GetTimeElapsed());
     return Tiles;
 }
 
@@ -363,74 +360,105 @@ Tile Gorillas::GetMeleeMoveTile(double Distance)
     auto ViableTiles = Gorillas::GetValidMoveTiles();
     if (ViableTiles.empty()) return Tile();
 
-    
+    auto Gorilla = GameListener::GetCurrentGorilla();
+    if (!Gorilla || !*Gorilla) return Tile();
 
+    auto PlayerArea = WorldArea(Internal::GetLocalPlayer());
+    auto GorillaArea = Gorilla->GetWorldArea();
 
-    return Tile();
-/*    auto ViableTiles = Gorillas::GetViableMoveTiles(Distance);
-    if (ViableTiles.empty()) return Tile();
+    std::int32_t MaxPlayerDistance = 4;
+    std::int32_t MaxGorillaDistance = 4;
+    std::int32_t MinPlayerDistance = 2;
+    std::int32_t MinGorillaDistance = 3;
 
-    auto PlayerPos = Mainscreen::GetTrueLocation();
-    auto Sort = [&](const std::pair<bool, Tile>& A, const std::pair<bool, Tile>& B) -> bool
+    auto Sort = [&](const std::pair<bool, WorldArea>& A, const std::pair<bool, WorldArea>& B) -> bool
     {
         if (A.first == B.first)
-            return Mainscreen::GetProjectedDistance(A.second, PlayerPos) < Mainscreen::GetProjectedDistance(B.second, PlayerPos);
+            return Mainscreen::GetProjectedDistance(A.second.AsTile(), PlayerArea.AsTile()) < Mainscreen::GetProjectedDistance(B.second.AsTile(), PlayerArea.AsTile());
         return A.first && !B.first;
     };
+
+    auto Find_Distance = [&](const std::pair<bool, WorldArea>& P) -> bool
+    {
+        auto PlayerDist = P.second.DistanceTo(PlayerArea);
+        auto GorillaDist = P.second.DistanceTo(GorillaArea);
+
+        return PlayerDist >= MinPlayerDistance && PlayerDist <= MaxPlayerDistance
+           && GorillaDist >= MinGorillaDistance && GorillaDist <= MaxGorillaDistance;
+    };
+
+    auto Find_InFront = [&](const std::pair<bool, WorldArea>& P) -> bool
+    {
+        return P.first && Find_Distance(P);
+    };
+
     std::sort(ViableTiles.begin(), ViableTiles.end(), Sort);
 
-    if (ViableTiles.size() > 1)
+    bool TryFurther = false;
+    if (TryFurther)
     {
-        if (ViableTiles[0].first && ViableTiles[1].first && ViableTiles[0].second.DistanceFrom(ViableTiles[1].second) < 2.00)
-            return UniformRandom() <= 0.35 ? ViableTiles[1].second : ViableTiles[0].second;
+        auto Found_InFront = std::find_if(ViableTiles.rbegin(), ViableTiles.rend(), Find_InFront);
+        if (Found_InFront != ViableTiles.rend())
+            return Found_InFront->second.AsTile();
+
+        auto Found_Distance = std::find_if(ViableTiles.rbegin(), ViableTiles.rend(), Find_Distance);
+        if (Found_Distance != ViableTiles.rend())
+            return Found_Distance->second.AsTile();
+    } else
+    {
+        auto Found_InFront = std::find_if(ViableTiles.begin(), ViableTiles.end(), Find_InFront);
+        if (Found_InFront != ViableTiles.end())
+            return Found_InFront->second.AsTile();
+
+        auto Found_Distance = std::find_if(ViableTiles.begin(), ViableTiles.end(), Find_Distance);
+        if (Found_Distance != ViableTiles.end())
+            return Found_Distance->second.AsTile();
     }
-    return ViableTiles.front().second;*/
+
+    MinPlayerDistance = 1;
+    MinGorillaDistance = 2;
+
+    auto Found_InFront = std::find_if(ViableTiles.begin(), ViableTiles.end(), Find_InFront);
+    if (Found_InFront != ViableTiles.end())
+        return Found_InFront->second.AsTile();
+
+    auto Found_Distance = std::find_if(ViableTiles.begin(), ViableTiles.end(), Find_Distance);
+    if (Found_Distance != ViableTiles.end())
+        return Found_Distance->second.AsTile();
+
+    return Tile();
 }
 
 Tile Gorillas::GetMeleeBoulderMoveTile(double Distance)
 {
     std::shared_ptr<Gorilla> CurrentGorilla = GameListener::GetCurrentGorilla();
-    if (CurrentGorilla && *CurrentGorilla)
-    {
-        auto ValidMovements = Gorillas::GetValidMovementAreas();
+    if (!CurrentGorilla || !*CurrentGorilla) return Tile();
 
-        std::vector<WorldArea> BoulderAreas = GameListener::GetBoulderAreas();
-        std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(CurrentGorilla->GetIndex(), true);
-        for (const auto& ValidMovement : ValidMovements)
-        {
-            bool IntersectsWithBoulder = std::any_of(BoulderAreas.begin(), BoulderAreas.end(),
-                                                     [&ValidMovement](const WorldArea& A) -> bool
-                                                     { return A && ValidMovement.IntersectsWith(A); });
-            bool IntersectsWithGorilla = std::any_of(GorillaAreas.begin(), GorillaAreas.end(),
-                                                     [&ValidMovement](const WorldArea& A) -> bool
-                                                     { return A && ValidMovement.IntersectsWith(A); });
+    auto GorillaArea = CurrentGorilla->GetWorldArea();
+    auto ValidMovements = Gorillas::GetValidMovementAreas();
 
-            if (!IntersectsWithBoulder && !IntersectsWithGorilla)
+    std::vector<WorldArea> BoulderAreas = GameListener::GetBoulderAreas();
+    std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(CurrentGorilla->GetIndex(), true);
+
+    ValidMovements.erase(
+            std::remove_if(ValidMovements.begin(), ValidMovements.end(), [&](const WorldArea& A) -> bool
             {
-                auto GorillaArea = CurrentGorilla->GetWorldArea();
-                if (!ValidMovement.IntersectsWith(GorillaArea) && ValidMovement.IsInMeleeDistance(GorillaArea))
-                    return ValidMovement.AsTile();
-            }
-        }
+                return std::any_of(GorillaAreas.begin(), GorillaAreas.end(), [&](const WorldArea& GA) -> bool { return GA.IntersectsWith(A); })
+                       || std::any_of(BoulderAreas.begin(), BoulderAreas.end(), [&](const WorldArea& BA) -> bool { return BA.IntersectsWith(A); });;
+            }), ValidMovements.end());
 
-       /* std::function<bool(const Tile&)> MovementBlocked = [&](const Tile& T) -> bool
-        {
-            const auto Area1 = WorldArea(T, 1, 1);
-            if (!Area1) return true;
-
-            bool IntersectsWithBoulder = std::any_of(BoulderAreas.begin(), BoulderAreas.end(), [&Area1](const WorldArea& A) -> bool { return A && Area1.IntersectsWith(A); });
-            bool IntersectsWithGorilla = std::any_of(GorillaAreas.begin(), GorillaAreas.end(), [&Area1](const WorldArea& A) -> bool { return A && Area1.IntersectsWith(A); });
-
-            return !IntersectsWithBoulder && !IntersectsWithGorilla;
-        };
-
-        for (const auto& ValidMovement : ValidMovements)
-        {
-            auto NextTravelPoint = ValidMovement.CalculateNextTravellingPoint(CurrentGorilla->GetWorldArea(), true, MovementBlocked);
-            if (NextTravelPoint.CanMelee(CurrentGorilla->GetWorldArea()))
-                return ValidMovement.AsTile();
-        }*/
+    for (const auto& ValidMovement : ValidMovements)
+    {
+        if (!ValidMovement.IntersectsWith(GorillaArea) && ValidMovement.IsInMeleeDistance(GorillaArea))
+            return ValidMovement.AsTile();
     }
+
+    for (const auto& ValidMovement : ValidMovements)
+    {
+        if (!ValidMovement.IntersectsWith(GorillaArea))
+            return ValidMovement.AsTile();
+    }
+
     return Tile();
 }
 
@@ -520,13 +548,36 @@ bool Gorillas::Fight()
     std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), true);
     std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas(true);
 
-/*    if (State & MELEE_MOVE)
+    if (State & MELEE_MOVE)
     {
-        //State = Gorillas::MeleeMove(State, Gorilla);
+        /*auto ViableTiles = Gorillas::GetValidMoveTiles();
+        if (!ViableTiles.empty())
+        {
+            auto PlayerArea = WorldArea(Internal::GetLocalPlayer());
+            auto GorillaArea = Gorilla->GetWorldArea();
+
+            std::int32_t MinPlayerDistance = 2;
+            std::int32_t MinGorillaDistance = 3;
+
+            auto Sort = [&](const std::pair<bool, WorldArea>& A, const std::pair<bool, WorldArea>& B) -> bool
+            {
+                if (A.first == B.first)
+                    return Mainscreen::GetProjectedDistance(A.second.AsTile(), PlayerArea.AsTile()) < Mainscreen::GetProjectedDistance(B.second.AsTile(), PlayerArea.AsTile());
+                return A.first && !B.first;
+            };
+
+            std::sort(ViableTiles.begin(), ViableTiles.end(), Sort);
+            for (std::uint32_t I = 0; I < ViableTiles.size(); I++)
+            {
+                std::string TextStr = std::to_string(ViableTiles[I].second.DistanceTo(PlayerArea)) + " | " + std::to_string(ViableTiles[I].second.DistanceTo(GorillaArea))
+                                                                                                                            + "\n[" + std::to_string(I) + "]";
+                Paint::DrawTile(ViableTiles[I].second.AsTile(), ViableTiles[I].first ? 0 : 255, ViableTiles[I].first ? 255 : 0, 0, 255);
+                Paint::DrawString(TextStr, Internal::TileToMainscreen(ViableTiles[I].second.AsTile(), 0, 0, 0), 0, 255, 255, 255);
+            }
+        }*/
+
 
         static Tile MeleeMoveTile;
-        std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas();
-        //std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), true);
 
         auto NextTravelingPoint = Gorilla->GetNextTravelingPoint(Mainscreen::GetTrueLocation(), GorillaAreas, PlayerAreas);
         auto NextTravelingTile = NextTravelingPoint.AsTile();
@@ -535,23 +586,38 @@ bool Gorillas::Fight()
         {
             if (!MeleeMoveTile)
                 MeleeMoveTile = Gorillas::GetMeleeMoveTile(1.00);
-            Paint::DrawTile(MeleeMoveTile, 255, 255, 0, 255);
+            Paint::DrawTile(MeleeMoveTile, 0, 255, 0, 255);
         } else
             MeleeMoveTile = Tile();
-    }*/
+    }
+
+    static Tile BoulderMeleeMoveTile;
+    if (State & BOULDER)
+    {
+        if (!BoulderMeleeMoveTile)
+            BoulderMeleeMoveTile = Gorillas::GetMeleeBoulderMoveTile(1.00);
+        Paint::DrawTile(BoulderMeleeMoveTile, 255, 255, 0, 255);
+    } else
+        BoulderMeleeMoveTile = Tile();
 
     Gorilla->Draw(true);
 
-    auto MoveTiles = Gorillas::GetValidMoveTiles();
+/*    auto MoveTiles = Gorillas::GetValidMoveTiles();
     for (const auto& T : MoveTiles)
     {
         Paint::DrawTile(T.second.AsTile(), T.first ? 0 : 255, T.first ? 255 : 0, 0, 255);
-        Paint::DrawString(std::to_string(T.second.DistanceTo(Gorilla->GetWorldArea())), Internal::TileToMainscreen(T.second.AsTile(), 0, 0, 0), 0, 255, 0, 255);
-    }
+        Paint::DrawString(std::to_string(T.second.DistanceTo(WorldArea(Internal::GetLocalPlayer()))) + " | " +
+                            std::to_string(T.second.DistanceTo(Gorilla->GetWorldArea())),
+                          Internal::TileToMainscreen(T.second.AsTile(), 0, 0, 0), 0, 255, 0, 255);
+    }*/
 
-    //auto NextPoint = WorldArea(Internal::GetLocalPlayer()).CalculateNextTravellingPoint(Gorilla->GetWorldArea(), true, MovementBlocked);
-    //if (NextPoint) Paint::DrawTile(NextPoint.AsTile(), 255, 255, 0, 255);
+    auto NextPoint = WorldArea(Internal::GetLocalPlayer()).CalculateNextTravellingPoint(Gorilla->GetWorldArea(), true);
+    if (NextPoint) Paint::DrawTile(NextPoint.AsTile(), 255, 0, 255, 255);
     //Paint::DrawTile(GetMeleeBoulderMoveTile(1.00), 255, 0, 255, 255);
+
+    auto ViableTiles = Gorillas::GetValidMoveTiles();
+    for (const auto& [Front, T] : ViableTiles )
+        Paint::DrawTile(T.AsTile(), Front ? 0 : 255, Front ? 255 : 0, 0, 255);
 
     return true;
 }

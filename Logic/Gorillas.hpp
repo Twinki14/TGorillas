@@ -31,6 +31,7 @@ namespace Gorillas
     };
 
     std::int32_t GetState();
+    std::string GetStateString(std::int32_t State = -1);
     std::int32_t GetEquippedStyle();
     std::int32_t GetEquippedWeaponStyle();
     std::int32_t GetDefenseAgainst(std::int32_t Style);
@@ -39,24 +40,37 @@ namespace Gorillas
 
     std::vector<WorldArea> GetValidMovementAreas();
     std::vector<std::pair<bool, WorldArea>> GetValidMoveTiles();
-    Tile GetMeleeMoveTile(double Distance);
-    Tile GetMeleeBoulderMoveTile(double Distance);
-    Tile GetRangedBoulderMoveTile(double Distance);
+    Tile GetMeleeMoveTile();
+    Tile GetBoulderMoveTile();
     bool IsAttacking();
     bool ShouldLeave();
+    bool ShouldInterrupt();
 
     bool AdjustCamera();
     bool Attack(bool Force, bool Wait = false);
-    bool SwitchPrayer(Prayer::PRAYERS Prayer);
+    bool SwitchPrayer(Prayer::PRAYERS Prayer, bool Force = false);
+
+    namespace
+    {
+        std::shared_ptr<Tile> CurrentMeleeMoveTile;
+        std::shared_ptr<Tile> CurrentBoulderMoveTile;
+
+        std::shared_ptr<Tile> GetCurrentMeleeMoveTile() { return CurrentMeleeMoveTile; };
+        std::shared_ptr<Tile> GetCurrentBoulderMoveTile() { return CurrentBoulderMoveTile; };
+    }
 
     bool MeleeMove(std::int32_t& State, const std::shared_ptr<Gorilla>& CurrentGorilla);
     bool BoulderMove(std::int32_t& State, const std::shared_ptr<Gorilla>& CurrentGorilla);
     bool Prayers(std::int32_t& State, const std::shared_ptr<Gorilla>& CurrentGorilla);
+    bool Gear(std::int32_t& State);
 
     bool WalkTo();
     bool Fight();
 
     void OnGameTick();
+
+
+    void Draw();
 }
 
 #endif // GORILLAS_HPP_INCLUDED

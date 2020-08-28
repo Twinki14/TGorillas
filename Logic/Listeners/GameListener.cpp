@@ -16,10 +16,11 @@ GameListener& GameListener::Instance()
 void GameListener::DrawGorillas()
 {
     std::shared_lock Lock(GorillasLock);
-    for (auto [Index, Gorilla] : GameListener::TrackedGorillas)
+    auto Current = GameListener::GetCurrentGorilla();
+    if (Current && *Current)
     {
-        if (!Gorilla) continue;
-        Gorilla->Draw(false);
+        Paint::DrawString(Gorillas::GetStateString(), Internal::TileToMainscreen(Mainscreen::GetTrueLocation(), 0, 0, 0) + Point(20, 0), 0, 255, 255, 255);
+        Current->Draw(true);
     }
 }
 
@@ -480,7 +481,7 @@ void GameListener::CheckGorillaAttacks()
                     if (Distance <= Globals::Gorillas::MAX_ATTACK_RANGE && Target->GetLastWorldArea()->HasLineOfSightTo(*Gorilla->GetLastWorldArea()))
                     {
                         const auto PredictedTile = PredictedNewArea.AsTile();
-                        const auto LastWorldAreaTile = Gorilla->GetLastWorldArea()->AsTile();
+                      /*  const auto LastWorldAreaTile = Gorilla->GetLastWorldArea()->AsTile();
                         const auto Area = Gorilla->GetWorldArea().AsTile();
 
                         auto DistAB = PredictedTile.DistanceFrom(LastWorldAreaTile);
@@ -493,25 +494,25 @@ void GameListener::CheckGorillaAttacks()
                         DebugLog("Gorilla > {} | {} > DistAB: {} ", Gorilla->GetIndex(), Target->GetIndex(), DistAB);
                         DebugLog("Gorilla > {} | {} > DistRL: {} ", Gorilla->GetIndex(), Target->GetIndex(), DistRL);
                         DebugLog("Gorilla > {} | {} > DistAB_Cur: {} ", Gorilla->GetIndex(), Target->GetIndex(), DistAB_Cur);
-                        DebugLog("Gorilla > {} | {} > DistRL_Cur: {} ", Gorilla->GetIndex(), Target->GetIndex(), DistRL_Cur);
+                        DebugLog("Gorilla > {} | {} > DistRL_Cur: {} ", Gorilla->GetIndex(), Target->GetIndex(), DistRL_Cur);*/
                         if (PredictedTile.DistanceFrom(Gorilla->GetLastWorldArea()->AsTile()) != 0.00)
                         {
                             const auto TrueLoc = Gorilla->GetTrueLocation();
-                            DistAB = PredictedTile.DistanceFrom(TrueLoc);
+                            /*DistAB = PredictedTile.DistanceFrom(TrueLoc);
                             DistRL = std::max(std::abs(PredictedTile.X - TrueLoc.X), std::abs(PredictedTile.Y - TrueLoc.Y));
 
                             DebugLog("Gorilla > {} | {} > DistAB: {} ", Gorilla->GetIndex(), Target->GetIndex(), DistAB);
-                            DebugLog("Gorilla > {} | {} > DistRL: {} ", Gorilla->GetIndex(), Target->GetIndex(), DistRL);
+                            DebugLog("Gorilla > {} | {} > DistRL: {} ", Gorilla->GetIndex(), Target->GetIndex(), DistRL);*/
                             if (PredictedTile.DistanceFrom(Gorilla->GetTrueLocation()) == 0.00)
                             {
                                 // Turn off all but MELEE
                                 Gorilla->NextPossibleAttackStyles &= ~Gorilla::RANGED_FLAG;
                                 Gorilla->NextPossibleAttackStyles &= ~Gorilla::MAGIC_FLAG;
                                 Gorilla->NextPossibleAttackStyles &= ~Gorilla::BOULDER_FLAG;
-                                DebugLog("Gorilla > {} > Switched ON melee > {} ", Gorilla->GetIndex(), Target->GetIndex());
+                                //DebugLog("Gorilla > {} > Switched ON melee > {} ", Gorilla->GetIndex(), Target->GetIndex());
                             } else
                             {
-                                DebugLog("Gorilla > {} > Switched OFF melee > {} ", Gorilla->GetIndex(), Target->GetIndex());
+                                //DebugLog("Gorilla > {} > Switched OFF melee > {} ", Gorilla->GetIndex(), Target->GetIndex());
                                 Gorilla->NextPossibleAttackStyles &= ~Gorilla::MELEE_FLAG;
                             }
                         } else if (TickCount >= Gorilla->NextAttackTick

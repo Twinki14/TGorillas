@@ -67,6 +67,22 @@ std::int32_t Gorillas::GetState()
     return State;
 }
 
+std::string Gorillas::GetStateString(std::int32_t State)
+{
+    if (State < 0) State = Gorillas::GetState();
+
+    std::string Str;
+    if (State & Gorillas::MELEE_MOVE) Str += "MELEE_MOVE\n";
+    if (State & Gorillas::BOULDER) Str += "BOULDER\n";
+    if (State & Gorillas::SWITCH_PRAYER_MELEE) Str += "SWITCH_PRAYER_MELEE\n";
+    if (State & Gorillas::SWITCH_PRAYER_RANGED) Str += "SWITCH_PRAYER_RANGED\n";
+    if (State & Gorillas::SWITCH_PRAYER_MAGIC) Str += "SWITCH_PRAYER_MAGIC\n";
+    if (State & Gorillas::EQUIP_MELEE) Str += "EQUIP_MELEE\n";
+    if (State & Gorillas::EQUIP_RANGED) Str += "EQUIP_RANGED\n";
+    if (State & Gorillas::EQUIP_SPECIAL) Str += "EQUIP_SPECIAL\n";
+    return Str;
+}
+
 std::int32_t Gorillas::GetEquippedStyle()
 {
     if (GearSets::Sets.count("Melee") && GearSets::Sets.count("Ranged"))
@@ -347,7 +363,7 @@ std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles()
     return Tiles;
 }
 
-Tile Gorillas::GetMeleeMoveTile(double Distance)
+Tile Gorillas::GetMeleeMoveTile()
 {
     auto ViableTiles = Gorillas::GetValidMoveTiles();
     if (ViableTiles.empty()) return Tile();
@@ -360,8 +376,8 @@ Tile Gorillas::GetMeleeMoveTile(double Distance)
 
     std::int32_t MaxPlayerDistance = 4;
     std::int32_t MaxGorillaDistance = 4;
-    std::int32_t MinPlayerDistance = 2;
-    std::int32_t MinGorillaDistance = 3;
+    std::int32_t MinPlayerDistance = 1;
+    std::int32_t MinGorillaDistance = 2;
 
     auto Sort = [&](const std::pair<bool, WorldArea>& A, const std::pair<bool, WorldArea>& B) -> bool
     {
@@ -421,7 +437,7 @@ Tile Gorillas::GetMeleeMoveTile(double Distance)
     return Tile();
 }
 
-Tile Gorillas::GetMeleeBoulderMoveTile(double Distance)
+Tile Gorillas::GetBoulderMoveTile()
 {
     std::shared_ptr<Gorilla> CurrentGorilla = GameListener::GetCurrentGorilla();
     if (!CurrentGorilla || !*CurrentGorilla) return Tile();
@@ -436,28 +452,69 @@ Tile Gorillas::GetMeleeBoulderMoveTile(double Distance)
             std::remove_if(ValidMovements.begin(), ValidMovements.end(), [&](const WorldArea& A) -> bool
             {
                 return std::any_of(GorillaAreas.begin(), GorillaAreas.end(), [&](const WorldArea& GA) -> bool { return GA.IntersectsWith(A); })
-                       || std::any_of(BoulderAreas.begin(), BoulderAreas.end(), [&](const WorldArea& BA) -> bool { return BA.IntersectsWith(A); });;
+                       || std::any_of(BoulderAreas.begin(), BoulderAreas.end(), [&](const WorldArea& BA) -> bool { return BA.IntersectsWith(A); });
             }), ValidMovements.end());
 
-    for (const auto& ValidMovement : ValidMovements)
+    if (Gorillas::GetEquippedWeaponStyle() == MELEE_FLAG)
     {
-        if (!ValidMovement.IntersectsWith(GorillaArea) && ValidMovement.IsInMeleeDistance(GorillaArea))
-            return ValidMovement.AsTile();
-    }
+        for (const auto& ValidMovement : ValidMovements)
+        {
+            if (!ValidMovement.IntersectsWith(GorillaArea) && ValidMovement.IsInMeleeDistance(GorillaArea))
+                return ValidMovement.AsTile();
+        }
 
-    for (const auto& ValidMovement : ValidMovements)
+        for (const auto& ValidMovement : ValidMovements)
+        {
+            if (!ValidMovement.IntersectsWith(GorillaArea))
+                return ValidMovement.AsTile();
+        }
+    } else // RANGED
     {
-        if (!ValidMovement.IntersectsWith(GorillaArea))
-            return ValidMovement.AsTile();
+        bool SomeInMelee = std::any_of(ValidMovements.begin(), ValidMovements.end(), [&](const WorldArea& W) -> bool
+        {
+            return W.IntersectsWith(GorillaArea) || W.IsInMeleeDistance(GorillaArea);
+        });
+
+        if (SomeInMelee) // Generate tile away from gorilla
+        {
+            auto Sort = [&](const WorldArea& WA, const WorldArea& WB) -> bool
+            {
+                return WA.DistanceTo(GorillaArea) > WB.DistanceTo(GorillaArea);
+            };
+            std::sort(ValidMovements.begin(), ValidMovements.end(), Sort);
+
+            for (const auto& ValidMovement : ValidMovements)
+            {
+                if (!ValidMovement.IntersectsWith(GorillaArea) && ValidMovement.HasLineOfSightTo(GorillaArea))
+                    return ValidMovement.AsTile();
+            }
+
+            for (const auto& ValidMovement : ValidMovements)
+            {
+                if (!ValidMovement.IntersectsWith(GorillaArea))
+                    return ValidMovement.AsTile();
+            }
+        } else // Generate tile towards gorilla
+        {
+            auto Sort = [&](const WorldArea& WA, const WorldArea& WB) -> bool
+            {
+                return WA.DistanceTo(GorillaArea) < WB.DistanceTo(GorillaArea);
+            };
+            std::sort(ValidMovements.begin(), ValidMovements.end(), Sort);
+
+            for (const auto& ValidMovement : ValidMovements)
+            {
+                if (!ValidMovement.IntersectsWith(GorillaArea) && ValidMovement.HasLineOfSightTo(GorillaArea))
+                    return ValidMovement.AsTile();
+            }
+
+            for (const auto& ValidMovement : ValidMovements)
+            {
+                if (!ValidMovement.IntersectsWith(GorillaArea))
+                    return ValidMovement.AsTile();
+            }
+        }
     }
-
-    return Tile();
-}
-
-Tile Gorillas::GetRangedBoulderMoveTile(double Distance)
-{
-    auto ValidMovements = Gorillas::GetValidMovementAreas();
-
     return Tile();
 }
 
@@ -481,6 +538,11 @@ bool Gorillas::IsAttacking()
 bool Gorillas::ShouldLeave()
 {
     return false;
+}
+
+bool Gorillas::ShouldInterrupt()
+{
+    return Gorillas::GetState() & BOULDER;
 }
 
 bool Gorillas::AdjustCamera()
@@ -516,7 +578,7 @@ bool Gorillas::Attack(bool Force, bool Wait)
     return false;
 }
 
-bool Gorillas::SwitchPrayer(Prayer::PRAYERS Prayer)
+bool Gorillas::SwitchPrayer(Prayer::PRAYERS Prayer, bool Force)
 {
     if (Prayer::IsActive(Prayer)) return true;
 
@@ -526,92 +588,241 @@ bool Gorillas::SwitchPrayer(Prayer::PRAYERS Prayer)
 
     if (Prayer::Open(Profile::RollUseGametabHotKey()))
     {
-        if (!Antiban::Tasks.count("GORILLAS_SWITCH_PRAYER"))
+        static auto LastPassivity = Profile::GetInt(Profile::Var_Passivity);
+        auto Passivity = Profile::GetInt(Profile::Var_Passivity);
+        if (!Antiban::Tasks.count("GORILLAS_SWITCH_PRAYER") || LastPassivity != Passivity)
         {
             Antiban::Task T;
-            switch (Profile::GetInt(Profile::Var_Passivity))
+            LastPassivity = Passivity;
+            switch (Passivity)
             {
-                case Profile::PASSIVITY_EXHILARATED: // 40-60 times an hour
-                {
+                // TODO Consider a new profile var - Focus maybe?
+                case Profile::PASSIVITY_EXHILARATED: T = Antiban::Task(8000, 0.00, 0.08); break; // 30-45 times an hour
+                case Profile::PASSIVITY_HYPER: T = Antiban::Task(8000, 0.00, 0.05); break; // 20-30 times an hour
+                case Profile::PASSIVITY_MILD: T = Antiban::Task(8000, 0.00, 0.3); break; // 10-20 times an hour
 
-                } break;
-
-                case Profile::PASSIVITY_HYPER: // 30-45 times an hour
-                {
-
-                } break;
-
-                case Profile::PASSIVITY_MILD: // switches to wrong prayer 15-25 times an hour
-                {
-
-                } break;
-
+                default:
                 case Profile::PASSIVITY_MELLOW:
-                case Profile::PASSIVITY_DISINTERESTED: // switches to wrong prayer 0-10 times an hour
-                {
-
-                } break;
+                case Profile::PASSIVITY_DISINTERESTED:  T = Antiban::Task(8000, 0.00, 0.01); break; // 0-10 times an hour
             }
-            Antiban::AddTask("GORILLAS_SWITCH_PRAYER", std::move(T));
+            Antiban::Tasks.insert_or_assign("GORILLAS_SWITCH_PRAYER", std::move(T));
         }
 
-        bool SwitchToWrongPrayer = Antiban::RunTask("GORILLAS_SWITCH_PRAYER");
-    }
+        bool SwitchToWrongPrayer = false; //Antiban::RunTask("GORILLAS_SWITCH_PRAYER");
 
+        bool Missclicked = false;
+        if (!Force && SwitchToWrongPrayer)
+        {
+            std::vector<Prayer::PRAYERS> MissclickPrayers;
+            switch (Prayer)
+            {
+                case Prayer::PROTECT_FROM_MELEE: MissclickPrayers = { Prayer::PROTECT_FROM_MISSILES, Prayer::PROTECT_FROM_MAGIC, Prayer::SMITE }; break;
+                case Prayer::PROTECT_FROM_MISSILES: MissclickPrayers = { Prayer::PROTECT_FROM_MELEE, Prayer::PROTECT_FROM_MAGIC, Prayer::REDEMPTION, Prayer::RETRIBUTION, Prayer::SMITE }; break;
+                case Prayer::PROTECT_FROM_MAGIC: MissclickPrayers = { Prayer::PROTECT_FROM_MISSILES, Prayer::PROTECT_FROM_MELEE, Prayer::RETRIBUTION }; break;
+                default: break;
+            }
+
+            if (!MissclickPrayers.empty())
+            {
+                Prayer::PRAYERS P = MissclickPrayers[UniformRandom(0, MissclickPrayers.size() - 1)];
+                DebugLog("Miss-clicking prayer > {}", P);
+                Script::SetStatus("Miss-clicking prayer");
+                Missclicked = Prayer::Activate(P);
+                if (Missclicked)
+                    Antiban::DelayFromPassivity(650, 2250, 1.8, 0.10);
+            }
+        }
+
+        if (Missclicked)
+            Script::SetStatus("Correcting miss-clicked prayer");
+        else
+            Script::SetStatus("Switching prayer");
+
+        bool Result = Prayer::Activate(Prayer);
+        Profile::Pop(3);
+        return Result;
+    }
+    Profile::Pop(3);
     return false;
 }
 
 bool Gorillas::MeleeMove(std::int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
 {
-    Tile MeleeMoveTile;
+    CurrentMeleeMoveTile = std::make_shared<Tile>(Tile());
+
+    static auto LastPassivity = Profile::GetInt(Profile::Var_Passivity);
+    auto Passivity = Profile::GetInt(Profile::Var_Passivity);
+    if (!Antiban::Tasks.count("GORILLAS_MELEE_MOVE_OPEN_PRAYER") || LastPassivity != Passivity)
+    {
+        Antiban::Task T;
+        LastPassivity = Passivity;
+        switch (Passivity)
+        {
+            // TODO Consider a new profile var - Focus maybe?
+            // TODO This needs to be changed for this specific purpose, this is using values from switch prayer
+            case Profile::PASSIVITY_EXHILARATED: T = Antiban::Task(8000, 0.00, 0.08); break; // 30-45 times an hour
+            case Profile::PASSIVITY_HYPER: T = Antiban::Task(8000, 0.00, 0.05); break; // 20-30 times an hour
+            case Profile::PASSIVITY_MILD: T = Antiban::Task(8000, 0.00, 0.3); break; // 10-20 times an hour
+
+            default:
+            case Profile::PASSIVITY_MELLOW:
+            case Profile::PASSIVITY_DISINTERESTED:  T = Antiban::Task(8000, 0.00, 0.01); break; // 0-10 times an hour
+        }
+        Antiban::Tasks.insert_or_assign("GORILLAS_MELEE_MOVE_OPEN_PRAYER", std::move(T));
+    }
+
+    bool OpenPrayerBefore = Antiban::RunTask("GORILLAS_MELEE_MOVE_OPEN_PRAYER");
+    bool OpenedPrayerBefore = false;
+
+    Tile LocalMoveTile;
+    bool Moved = false;
     while (State & MELEE_MOVE)
     {
         /*
          * After clicking the move tile, sometimes open the prayer menu as if to be ready
          */
-        std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas();
-        std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), true);
 
-        auto NextTravelingPoint = Gorilla->GetNextTravelingPoint(Mainscreen::GetTrueLocation(), GorillaAreas, PlayerAreas);
-        auto NextTravelingTile = NextTravelingPoint.AsTile();
+        if (Terminate) return false;
+        if (Combat::GetHealth() <= 0) break;
+        if (!Gorilla || !*Gorilla) break;
+        if (Gorilla->IsDead()) break;
 
-        if (!NextTravelingTile || NextTravelingTile.DistanceFrom(Gorilla->GetTrueLocation()) == 0.00)
+/*        auto GetNextGorillaTravelPoint = [&]() -> Tile
         {
-            if (!MeleeMoveTile)
-                MeleeMoveTile = Gorillas::GetMeleeMoveTile(2.00);
-        }
+            std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas();
+            std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), true);
 
+            auto NextTravelingPoint = Gorilla->GetNextTravelingPoint(Mainscreen::GetTrueLocation(), GorillaAreas, PlayerAreas);
+            return NextTravelingPoint.AsTile();
+        };
+
+        auto NextTravelingTile = GetNextGorillaTravelPoint();*/
+        bool FarEnoughAway = Gorilla->GetWorldArea().DistanceTo(Mainscreen::GetTrueLocation()) >= 2; //NextTravelingTile && NextTravelingTile.DistanceFrom(Gorilla->GetTrueLocation()) >= 1.00;
+
+        if (!FarEnoughAway)
+        {
+            if (!CurrentMeleeMoveTile || !*CurrentMeleeMoveTile || !LocalMoveTile)
+            {
+                LocalMoveTile = Gorillas::GetMeleeMoveTile();
+                CurrentMeleeMoveTile = std::make_shared<Tile>(Tile(LocalMoveTile));
+            }
+
+            if (!LocalMoveTile)
+                DebugLog("Failed to generate a tile!");
+
+            if (LocalMoveTile && !Moved)
+            {
+                if (OpenPrayerBefore && !OpenedPrayerBefore)
+                {
+                    Prayer::Open(Profile::RollUseGametabHotKey());
+                    OpenedPrayerBefore = true;
+                }
+
+                Moved = Mainscreen::ClickTileEx(LocalMoveTile);
+            }
+
+            if (Moved)
+            {
+                /*
+                 * TODO Antipattern
+                 * Have this use the FOCUS var or whatever instead
+                 * - "Do we pray the 'at-ranged' prayer here? or wait until numstyles becomes 1"
+                 */
+
+                if (Gorilla->CountNextPossibleAttackStyles() > 1 && Prayer::Open(Profile::RollUseGametabHotKey()))
+                {
+                    if (Gorilla->NextPossibleAttackStyles & Gorilla::MAGIC_FLAG)
+                        Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MAGIC);
+                    else if (Gorilla->NextPossibleAttackStyles & Gorilla::RANGED_FLAG)
+                        Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MISSILES);
+                }
+            }
+
+        }
         State = Gorillas::GetState();
     }
+    CurrentMeleeMoveTile = std::make_shared<Tile>(Tile());
     return true;
 }
 
 bool Gorillas::BoulderMove(int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
 {
     /*
-     * if we are equipped for melee, and the next traveling point will not be the boulder tile, then just click attack
+     * if we are equipped for melee, and the next traveling point will not be the boulder tile, then just click attack - DONE
+     *
      * if we are equipped ranged, but we need to switch to melee, switch to melee after clicking to move, but we need to generate a tile that can path safely to melee range if possible
      *      we could switch to melee before moving, and we should sometimes for sake of anti-bot
-     * if we are equipped ranged, and we don't need to switch to melee, randomly decide to generate a tile > 1 distance away from the gorilla, efficiently be ready for MELEE_MOVE
-     *      if we are already > 2 away, pick a tile within attack range, preferably in front of the gorilla (the ones with the lowest distance)
      *
+     * if we are equipped ranged, and we don't need to switch to melee, randomly decide to generate a tile > 1 distance away from the gorilla, efficiently be ready for MELEE_MOVE
+     *      if we are already > 2 away, pick a tile within attack range, preferably in front of the gorilla (the ones with the lowest distance)  - DONE
      */
 
+    /*
+     * TODO
+     * if need to equip melee, generate tile near gorilla, "walk to melee", equip melee while walking
+     */
 
-    while (State & MELEE_MOVE)
+    CurrentBoulderMoveTile = std::make_shared<Tile>(Tile());
+    Tile LocalMoveTile;
+    bool Moved = false;
+    while (State & BOULDER)
     {
+        if (Terminate) return false;
+        if (Combat::GetHealth() <= 0) break;
+        if (!Gorilla || !*Gorilla) break;
+        if (Gorilla->IsDead()) break;
 
+        if (!CurrentMeleeMoveTile || !*CurrentMeleeMoveTile || !LocalMoveTile)
+        {
+            LocalMoveTile = Gorillas::GetBoulderMoveTile();
+            CurrentMeleeMoveTile = std::make_shared<Tile>(Tile(LocalMoveTile));
+        }
+
+        if (!Moved)
+        {
+            if (Gorillas::GetEquippedWeaponStyle() == MELEE_FLAG)
+            {
+                auto PlayerArea = WorldArea(Internal::GetLocalPlayer());
+                auto NextPoint = PlayerArea.CalculateNextTravellingPoint(Gorilla->GetWorldArea(), true);
+                if (NextPoint.DistanceTo(PlayerArea) > 0)
+                {
+                    if (Gorillas::Attack(true, true))
+                    {
+                        Moved = true;
+                        continue;
+                    }
+                }
+            }
+
+            if (Mainscreen::ClickTileEx(LocalMoveTile, true))
+            {
+                Moved = true;
+                continue;
+            }
+
+        } else
+        {
+            if (Gorillas::GetEquippedWeaponStyle() == MELEE_FLAG)
+            {
+                auto PlayerArea = WorldArea(Internal::GetLocalPlayer());
+                auto NextPoint = PlayerArea.CalculateNextTravellingPoint(Gorilla->GetWorldArea(), true);
+
+                if (!GameListener::AnyActiveBoulderOn(PlayerArea.AsTile()) && !GameListener::AnyActiveBoulderOn(NextPoint.AsTile()))
+                    Gorillas::Attack(false, true);
+            } else
+            {
+                if (!GameListener::AnyActiveBoulderOn(Mainscreen::GetTrueLocation()))
+                    Gorillas::Attack(false, true);
+            }
+        }
+        State = Gorillas::GetState();
     }
-    //State = Gorillas::GetState();
+    CurrentBoulderMoveTile = std::make_shared<Tile>(Tile());
     return false;
 }
 
 bool Gorillas::Prayers(int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
 {
-    Profile::Push(Profile::Var_RawInteractableMean, 125);
-    Profile::Push(Profile::Var_RawMoveMean, 75);
-    Profile::Push(Profile::Var_RawMouseUpMean, 0);
-
     if (Gorilla->CountNextPossibleAttackStyles() == 1)
     {
         if (State & SWITCH_PRAYER_MELEE) return Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MELEE);
@@ -638,6 +849,14 @@ bool Gorillas::Prayers(int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
     return false;
 }
 
+bool Gorillas::Gear(int32_t& State)
+{
+    if (State & EQUIP_MELEE) return GearSets::Sets.count("Melee") && GearSets::Sets["Melee"].Equip(Gorillas::ShouldInterrupt);
+    if (State & EQUIP_RANGED) return GearSets::Sets.count("Ranged") && GearSets::Sets["Ranged"].Equip(Gorillas::ShouldInterrupt);
+    if (State & EQUIP_SPECIAL) return GearSets::Sets.count("Special") && GearSets::Sets["Special"].Equip(Gorillas::ShouldInterrupt);
+    return false;
+}
+
 bool Gorillas::WalkTo()
 {
     if (!Travel::InCavern()) return false;
@@ -656,17 +875,67 @@ bool Gorillas::Fight()
 
         std::int32_t State = Gorillas::GetState();
         std::shared_ptr<Gorilla> Gorilla = GameListener::GetCurrentGorilla();
-        if (!Gorilla || !*Gorilla) break;
-
+        if (!Gorilla || !*Gorilla) continue;
         if (Gorilla->IsDead()) continue;
 
+        bool CanRelax = Gorilla->AttacksUntilSwitch >= 3 && Gorilla->CountNextPossibleAttackStyles() == 1;
 
-        if (State & )
+        if (State & MELEE_MOVE)
+        {
+            Gorillas::MeleeMove(State, Gorilla);
+            State = Gorillas::GetState();
+        }
 
+        if (State & BOULDER)
+        {
+            Gorillas::BoulderMove(State, Gorilla);
+            State = Gorillas::GetState();
+        }
 
+        if (State & SWITCH_PRAYER_MELEE || State & SWITCH_PRAYER_RANGED || State & SWITCH_PRAYER_MAGIC)
+        {
+            Gorillas::Prayers(State, Gorilla);
+            State = Gorillas::GetState();
+        }
 
+        if (State & EQUIP_MELEE || State & EQUIP_RANGED || State & EQUIP_SPECIAL)
+        {
+            Gorillas::Gear(State);
+            State = Gorillas::GetState();
+        }
 
+        if (State == 0)
+            Gorillas::Attack(false, true);
+
+        if (CanRelax)
+        {
+            //DebugLog("Relaxing...");
+        }
     }
     GameListener::Instance().Stop(true);
     return true;
+}
+
+void Gorillas::Draw()
+{
+    auto Current = GameListener::GetCurrentGorilla();
+    if (Current && *Current)
+    {
+        auto State = Gorillas::GetState();
+
+        if (State & MELEE_MOVE)
+        {
+            auto MeleeMoveTile = Gorillas::GetCurrentMeleeMoveTile();
+            if (MeleeMoveTile) Paint::DrawTile(*MeleeMoveTile, 0, 255, 0, 255);
+        }
+
+        if (State & BOULDER)
+        {
+            auto BoulderMoveTile = Gorillas::GetCurrentBoulderMoveTile();
+            if (BoulderMoveTile) Paint::DrawTile(*BoulderMoveTile, 200, 0, 255, 255);
+        }
+
+        Paint::DrawString(Gorillas::GetStateString(State), Internal::TileToMainscreen(Minimap::GetPosition(), 0, 0, 0) + Point(20, 0), 0, 255, 255, 255);
+        Current->Draw(true);
+    }
 }

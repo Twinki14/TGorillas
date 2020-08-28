@@ -30,9 +30,7 @@ void Setup()
 void PaintMethod()
 {
     Paint::Clear();
-    GameListener::DrawGorillas();
-    GameListener::DrawPlayers();
-    GameListener::DrawProjectiles();
+    Gorillas::Draw();
     Paint::SwapBuffer();
 }
 
@@ -50,9 +48,22 @@ bool OnStart()
     }
 
     SetLoopDelay(0);
+    //return true;
 
     //if (GUI::Init())
     {
+
+/*        GearSets::SetFromEquipped("Melee");
+        //GearSets::SetFromEquipped("Ranged");
+        for (std::uint32_t I = Equipment::HEAD; I <= Equipment::AMMO; I++)
+        {
+            Config::Cfg["GearSet_Melee_Names"][I] = GearSets::Sets["Melee"].Items[I].Name;
+            Config::Cfg["GearSet_Melee_IDs"][I] = GearSets::Sets["Melee"].Items[I].ID;
+
+            Config::Cfg["GearSet_Ranged_Names"][I] = GearSets::Sets["Ranged"].Items[I].Name;
+            Config::Cfg["GearSet_Ranged_IDs"][I] = GearSets::Sets["Ranged"].Items[I].ID;
+        }*/
+
         Config::SaveArgs("default.json");
         Config::SetGearsets();
         Config::SetAntiban();

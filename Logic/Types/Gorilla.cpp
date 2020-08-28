@@ -116,7 +116,7 @@ bool Gorilla::InCombat() const
 {
     auto AnimationID = this->GetAnimationID();
     return this->InitiatedCombat && (
-            (this->NextAttackTick > GameListener::GetTickCount())
+            (this->NextAttackTick >= GameListener::GetTickCount())
             || (AnimationID >= Globals::Gorillas::ANIMATION_DEFEND && AnimationID <= Globals::Gorillas::ANIMATION_AOE_ATTACK));
 }
 

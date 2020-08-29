@@ -36,6 +36,8 @@ public:
     static std::vector<WorldArea> GetBoulderAreas();
 
     static std::uint32_t GetTickCount();
+    static std::int64_t GetLastTickTime();
+    static std::int64_t GetTimeSinceLastTick();
 
 private:
 

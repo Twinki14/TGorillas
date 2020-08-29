@@ -347,6 +347,7 @@ void GameListener::CheckGorillaAttacks()
 {
     std::shared_lock Lock(GorillasLock);
     std::vector<WorldArea> PlayerAreas;
+
     for (auto [Index, Gorilla] : GameListener::TrackedGorillas)
     {
         Internal::Player Interacting = Gorilla->GetInteractingPlayer();
@@ -657,7 +658,7 @@ void GameListener::ClearCurrentGorilla()
 
 void GameListener::OnStart()
 {
-    GameListener::LastTickTime = CurrentTimeMillis();
+    //GameListener::LastTickTime = CurrentTimeMillis();
 }
 
 void GameListener::Loop()
@@ -1115,9 +1116,18 @@ std::uint32_t GameListener::GetTickCount()
     return TickCount;
 }
 
+std::int64_t GameListener::GetLastTickTime()
+{
+    return LastTickTime;
+}
+
+std::int64_t GameListener::GetTimeSinceLastTick()
+{
+    return LastTickTime - CurrentTimeMillis();
+}
+
 GameListener::GameListener() : LoopTask("GameListener", std::chrono::milliseconds(20), GameListener::Loop)
 {
 
 }
-
 

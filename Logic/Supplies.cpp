@@ -81,6 +81,7 @@ Supplies::SUPPLY_ITEMS_SNAPSHOT Supplies::GetSnapshot(bool InventoryOnly)
     static const auto UseHighAlchemy = Config::Get("UseHighAlchemy").as_bool();
     static const auto Food = (Food::FOOD) Config::Get("Food").as_integer<int>();
     static const auto FoodID = Food::GetItemID(Food);
+    static const auto SharkID = Food::GetItemID(Food::SHARK);
 
     Supplies::SUPPLY_ITEMS_SNAPSHOT Result = { };
 
@@ -115,6 +116,7 @@ Supplies::SUPPLY_ITEMS_SNAPSHOT Supplies::GetSnapshot(bool InventoryOnly)
     Result.Potions_Inv_Ranging          = CountPotions((UseDivinePots) ? Globals::ITEM_DIVINE_RANGING_POTION: Globals::ITEM_RANGING_POTION, InventoryContainerItems, true);
     Result.Potions_Inv_SuperCombat      = CountPotions((UseDivinePots) ? Globals::ITEM_DIVINE_SUPER_COMBAT_POTION : Globals::ITEM_SUPER_COMBAT_POTION, InventoryContainerItems, true);
     Result.Food_Inv = Inventory::Count(FoodID, InventoryContainerItems);
+    Result.Sharks_Inv = Inventory::Count(SharkID, InventoryContainerItems);
     Result.HighAlchemyCasts_Inv = CountAlchemyCasts();
     Result.EmptySlots_Inv = Inventory::CountEmpty();
     Result.NonSupplyItems_Inv = GetNonSupplyItems(InventoryContainerItems);

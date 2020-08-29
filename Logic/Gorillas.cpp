@@ -3,15 +3,12 @@
 #include <Utilities/Mainscreen.hpp>
 #include <Utilities/TProfile.hpp>
 #include <Utilities/Antiban.hpp>
-#include <Game/Models/Players.hpp>
-#include <Game/Interfaces/GameTabs/Prayer.hpp>
-#include <Game/Interfaces/Minimap.hpp>
-#include <Game/Tools/Pathfinding.hpp>
-#include <Tools/OSRSBox/Items.hpp>
-#include <Game/Interfaces/GameTabs/Equipment.hpp>
+#include <Utilities/Prayer.hpp>
 #include <Game/Core.hpp>
+#include <Tools/OSRSBox/Items.hpp>
 #include "Gorillas.hpp"
 #include "Travel.hpp"
+#include "Supplies.hpp"
 #include "Listeners/GameListener.hpp"
 #include "../Config.hpp"
 
@@ -94,6 +91,7 @@ std::int32_t Gorillas::GetEquippedStyle()
         {
             switch (Config::Get("SpecialWeapon").as_integer<int>())
             {
+                case Config::MAGIC_SHORTBOW: return RANGED_FLAG; break;
                 case Config::TOXIC_BLOWPIPE: return RANGED_FLAG; break;
                 case Config::SARADOMIN_GODSWORD: return MELEE_FLAG; break;
                 default: break;
@@ -117,6 +115,7 @@ std::int32_t Gorillas::GetEquippedWeaponStyle()
             {
                 switch (Config::Get("SpecialWeapon").as_integer<int>())
                 {
+                    case Config::MAGIC_SHORTBOW: return RANGED_FLAG; break;
                     case Config::TOXIC_BLOWPIPE: return RANGED_FLAG; break;
                     case Config::SARADOMIN_GODSWORD: return MELEE_FLAG; break;
                     default: break;
@@ -210,11 +209,10 @@ std::vector<WorldArea> Gorillas::GetValidMovementAreas()
     return Result;
 }
 
-std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles()
+std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles(const std::shared_ptr<Gorilla>& Gorilla)
 {
     std::vector<std::pair<bool, WorldArea>> Tiles;
-    std::shared_ptr<Gorilla> CurrentGorilla = GameListener::GetCurrentGorilla();
-    if (!CurrentGorilla || !*CurrentGorilla) return Tiles;
+    if (!Gorilla || !*Gorilla) return Tiles;
 
     const auto PlayerPos = Mainscreen::GetTrueLocation();
 
@@ -223,7 +221,7 @@ std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles()
     auto CollisionFlags = Internal::GetCollisionMap(PlayerPos.Plane).GetFlags();
 
     std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas(false);
-    std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(CurrentGorilla->GetIndex(), true);
+    std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), true);
     std::vector<WorldArea> BoulderAreas = GameListener::GetBoulderAreas();
 
     auto ModifiedCollisionFlags = CollisionFlags;
@@ -243,8 +241,8 @@ std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles()
     }
 
     constexpr int CULL_LINE_OF_SIGHT_RANGE = 5;
-    WorldArea Area = CurrentGorilla->GetWorldArea();
-    auto FacingDirection = CurrentGorilla->GetFacingDirection();
+    WorldArea Area = Gorilla->GetWorldArea();
+    auto FacingDirection = Gorilla->GetFacingDirection();
 
     for (int X = Area.GetX() - CULL_LINE_OF_SIGHT_RANGE; X <= Area.GetX() + CULL_LINE_OF_SIGHT_RANGE; X++)
     {
@@ -284,7 +282,7 @@ std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles()
 
             if (Area.DistanceTo(Next) < Globals::Gorillas::MAX_ATTACK_RANGE && Area.HasLineOfSightTo(Next, ModifiedCollisionFlags))
             {
-                auto PredictedNewArea = CurrentGorilla->GetNextTravelingPoint(Next, GorillaAreas, PlayerAreas);
+                auto PredictedNewArea = Gorilla->GetNextTravelingPoint(Next, GorillaAreas, PlayerAreas);
                 if (PredictedNewArea)
                 {
                     auto PredictedTile = PredictedNewArea.AsTile();
@@ -363,13 +361,11 @@ std::vector<std::pair<bool, WorldArea>> Gorillas::GetValidMoveTiles()
     return Tiles;
 }
 
-Tile Gorillas::GetMeleeMoveTile()
+Tile Gorillas::GetMeleeMoveTile(const std::shared_ptr<Gorilla>& Gorilla)
 {
-    auto ViableTiles = Gorillas::GetValidMoveTiles();
-    if (ViableTiles.empty()) return Tile();
-
-    auto Gorilla = GameListener::GetCurrentGorilla();
     if (!Gorilla || !*Gorilla) return Tile();
+    auto ViableTiles = Gorillas::GetValidMoveTiles(Gorilla);
+    if (ViableTiles.empty()) return Tile();
 
     auto PlayerArea = WorldArea(Internal::GetLocalPlayer());
     auto GorillaArea = Gorilla->GetWorldArea();
@@ -437,16 +433,15 @@ Tile Gorillas::GetMeleeMoveTile()
     return Tile();
 }
 
-Tile Gorillas::GetBoulderMoveTile()
+Tile Gorillas::GetBoulderMoveTile(const std::shared_ptr<Gorilla>& Gorilla)
 {
-    std::shared_ptr<Gorilla> CurrentGorilla = GameListener::GetCurrentGorilla();
-    if (!CurrentGorilla || !*CurrentGorilla) return Tile();
+    if (!Gorilla || !*Gorilla) return Tile();
 
-    auto GorillaArea = CurrentGorilla->GetWorldArea();
+    auto GorillaArea = Gorilla->GetWorldArea();
     auto ValidMovements = Gorillas::GetValidMovementAreas();
 
     std::vector<WorldArea> BoulderAreas = GameListener::GetBoulderAreas();
-    std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(CurrentGorilla->GetIndex(), true);
+    std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), true);
 
     ValidMovements.erase(
             std::remove_if(ValidMovements.begin(), ValidMovements.end(), [&](const WorldArea& A) -> bool
@@ -518,9 +513,40 @@ Tile Gorillas::GetBoulderMoveTile()
     return Tile();
 }
 
+Tile Gorillas::GetGorillaMoveTile(const std::shared_ptr<Gorilla>& Gorilla)
+{
+    if (!Gorilla || !*Gorilla) return Tile();
+
+    auto ValidMovements = Gorilla->GetSurroundingMovementAreas();
+
+    WorldArea PlayerArea(Internal::GetLocalPlayer());
+    std::vector<WorldArea> BoulderAreas = GameListener::GetBoulderAreas();
+    std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), true);
+
+    ValidMovements.erase(
+            std::remove_if(ValidMovements.begin(), ValidMovements.end(), [&](const WorldArea& A) -> bool
+            {
+                return std::any_of(GorillaAreas.begin(), GorillaAreas.end(), [&](const WorldArea& GA) -> bool { return GA.IntersectsWith(A); })
+                       || std::any_of(BoulderAreas.begin(), BoulderAreas.end(), [&](const WorldArea& BA) -> bool { return BA.IntersectsWith(A); });
+            }), ValidMovements.end());
+
+    if (!ValidMovements.empty())
+    {
+        auto Sort = [&](const WorldArea& AA, const WorldArea& AB) -> bool { return AA.AsTile().DistanceFrom(PlayerArea.AsTile()) < AB.AsTile().DistanceFrom(PlayerArea.AsTile()); };
+        std::sort(ValidMovements.begin(), ValidMovements.end(), Sort);
+        return ValidMovements.front().AsTile();
+    }
+    return Tile();
+}
+
 bool Gorillas::IsAttacking()
 {
-    auto Gorilla = GameListener::GetCurrentGorilla();
+    auto Current = GameListener::GetCurrentGorilla();
+    return Gorillas::IsAttacking(Current);
+}
+
+bool Gorillas::IsAttacking(const std::shared_ptr<Gorilla>& Gorilla)
+{
     auto Player = Players::GetLocal();
     if (!Gorilla || !*Gorilla || !Player) return false;
 
@@ -551,14 +577,11 @@ bool Gorillas::AdjustCamera()
     return false;
 }
 
-bool Gorillas::Attack(bool Force, bool Wait)
+bool Gorillas::Attack( const std::shared_ptr<Gorilla>& Gorilla, bool Force, bool Wait)
 {
-    if (Force || !Gorillas::IsAttacking())
+    if (!Gorilla || !*Gorilla || Gorilla->IsDead()) return false;
+    if (Force || !Gorillas::IsAttacking(Gorilla))
     {
-        auto Gorilla = GameListener::GetCurrentGorilla();
-        if (!Gorilla || !*Gorilla) return false;
-
-        if (Gorilla->IsDead()) return false;
         //if (!Force && Vorkath::GetTimeSinceLastAttack() < 1600) return false;
 
         Script::SetStatus("Attacking");
@@ -572,7 +595,7 @@ bool Gorillas::Attack(bool Force, bool Wait)
         Profile::Pop(5);
 
         if (!Result) Gorillas::AdjustCamera();
-        if (Wait) return Result && WaitFunc(450, 25, Gorillas::IsAttacking, true);
+        if (Wait) return Result && WaitFunc(450, 25, [&]() -> bool { return Gorillas::IsAttacking(Gorilla); } , true);
         return Result;
     }
     return false;
@@ -646,6 +669,11 @@ bool Gorillas::SwitchPrayer(Prayer::PRAYERS Prayer, bool Force)
     return false;
 }
 
+bool Gorillas::StopCasting()
+{
+    return false;
+}
+
 bool Gorillas::MeleeMove(std::int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
 {
     CurrentMeleeMoveTile = std::make_shared<Tile>(Tile());
@@ -703,7 +731,7 @@ bool Gorillas::MeleeMove(std::int32_t& State, const std::shared_ptr<Gorilla>& Go
         {
             if (!CurrentMeleeMoveTile || !*CurrentMeleeMoveTile || !LocalMoveTile)
             {
-                LocalMoveTile = Gorillas::GetMeleeMoveTile();
+                LocalMoveTile = Gorillas::GetMeleeMoveTile(Gorilla);
                 CurrentMeleeMoveTile = std::make_shared<Tile>(Tile(LocalMoveTile));
             }
 
@@ -757,11 +785,6 @@ bool Gorillas::BoulderMove(int32_t& State, const std::shared_ptr<Gorilla>& Goril
      *      if we are already > 2 away, pick a tile within attack range, preferably in front of the gorilla (the ones with the lowest distance)  - DONE
      */
 
-    /*
-     * TODO
-     * if need to equip melee, generate tile near gorilla, "walk to melee", equip melee while walking
-     */
-
     CurrentBoulderMoveTile = std::make_shared<Tile>(Tile());
     Tile LocalMoveTile;
     bool Moved = false;
@@ -772,21 +795,28 @@ bool Gorillas::BoulderMove(int32_t& State, const std::shared_ptr<Gorilla>& Goril
         if (!Gorilla || !*Gorilla) break;
         if (Gorilla->IsDead()) break;
 
-        if (!CurrentMeleeMoveTile || !*CurrentMeleeMoveTile || !LocalMoveTile)
+        if (!CurrentBoulderMoveTile || !*CurrentBoulderMoveTile || !LocalMoveTile)
         {
-            LocalMoveTile = Gorillas::GetBoulderMoveTile();
-            CurrentMeleeMoveTile = std::make_shared<Tile>(Tile(LocalMoveTile));
+            LocalMoveTile = Gorillas::GetBoulderMoveTile(Gorilla);
+            CurrentBoulderMoveTile = std::make_shared<Tile>(Tile(LocalMoveTile));
         }
 
         if (!Moved)
         {
+            // TODO Anti-pattern/Anti-ban, maybe have some of these more specific things happen randomly
+
+            if (State & EQUIP_MELEE) // generate tile near gorilla, "walk to melee", equip melee while walking
+            {
+                
+            }
+
             if (Gorillas::GetEquippedWeaponStyle() == MELEE_FLAG)
             {
                 auto PlayerArea = WorldArea(Internal::GetLocalPlayer());
                 auto NextPoint = PlayerArea.CalculateNextTravellingPoint(Gorilla->GetWorldArea(), true);
                 if (NextPoint.DistanceTo(PlayerArea) > 0)
                 {
-                    if (Gorillas::Attack(true, true))
+                    if (Gorillas::Attack(Gorilla, true, true))
                     {
                         Moved = true;
                         continue;
@@ -808,11 +838,11 @@ bool Gorillas::BoulderMove(int32_t& State, const std::shared_ptr<Gorilla>& Goril
                 auto NextPoint = PlayerArea.CalculateNextTravellingPoint(Gorilla->GetWorldArea(), true);
 
                 if (!GameListener::AnyActiveBoulderOn(PlayerArea.AsTile()) && !GameListener::AnyActiveBoulderOn(NextPoint.AsTile()))
-                    Gorillas::Attack(false, true);
+                    Gorillas::Attack(Gorilla, false, true);
             } else
             {
                 if (!GameListener::AnyActiveBoulderOn(Mainscreen::GetTrueLocation()))
-                    Gorillas::Attack(false, true);
+                    Gorillas::Attack(Gorilla, false, true);
             }
         }
         State = Gorillas::GetState();
@@ -849,11 +879,110 @@ bool Gorillas::Prayers(int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
     return false;
 }
 
-bool Gorillas::Gear(int32_t& State)
+bool Gorillas::Gear(int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
 {
-    if (State & EQUIP_MELEE) return GearSets::Sets.count("Melee") && GearSets::Sets["Melee"].Equip(Gorillas::ShouldInterrupt);
+    if (State & EQUIP_MELEE)
+    {
+        /* TODO
+         *  If out of range, sometimes click near gorilla
+         */
+
+        if (GearSets::Sets.count("Melee"))
+        {
+            // TODO Tie this to antiban task
+            if (Gorilla && *Gorilla && Gorilla->InCombat())
+            {
+                if (Gorilla->GetWorldArea().DistanceTo(Mainscreen::GetTrueLocation()) >= 2)
+                {
+                    auto GorillaTile = Gorillas::GetGorillaMoveTile(Gorilla);
+                    if (GorillaTile && Mainscreen::ClickTileEx(GorillaTile, true))
+                        return GearSets::Sets["Melee"].Equip(Gorillas::ShouldInterrupt);
+                }
+            }
+            return GearSets::Sets["Melee"].Equip(Gorillas::ShouldInterrupt);
+        }
+        return false;
+    }
     if (State & EQUIP_RANGED) return GearSets::Sets.count("Ranged") && GearSets::Sets["Ranged"].Equip(Gorillas::ShouldInterrupt);
     if (State & EQUIP_SPECIAL) return GearSets::Sets.count("Special") && GearSets::Sets["Special"].Equip(Gorillas::ShouldInterrupt);
+    return false;
+}
+
+bool Gorillas::Special()
+{
+    // don't instantly activate when ready
+    // use a antiban task, run every 10-30ss if CanSpecial
+    switch (Config::Get("SpecialWeapon").as_integer<int>())
+    {
+        case Config::MAGIC_SHORTBOW: break;
+        case Config::TOXIC_BLOWPIPE: break;
+        case Config::SARADOMIN_GODSWORD: break;
+        default: break;
+    }
+    return false;
+}
+
+bool Gorillas::Food()
+{
+    static const auto FoodCfg = (Food::FOOD) Config::Get("Food").as_integer<int>();
+    static const auto FoodID = Food::GetItemID(FoodCfg);
+    static const auto SharkID = Food::GetItemID(Food::SHARK);
+
+    std::int32_t CurrentHealth = Stats::GetCurrentLevel(Stats::HITPOINTS);
+    if (CurrentHealth <= 0) return false;
+
+    static bool Trigger = false;
+    static std::int32_t NextCheck = NormalRandom(30, 34, 32, 32 * 0.06);
+
+    if (CurrentHealth <= NextCheck)
+    {
+        auto Snapshot = Supplies::GetSnapshot(true);
+        if (Snapshot.Food_Inv <= 0 && Snapshot.Sharks_Inv <= 0)
+        {
+            Trigger = false;
+            return false;
+        }
+
+        Trigger = true;
+        Gorillas::StopCasting();
+        Script::SetStatus("Eating food");
+        if (Snapshot.Sharks_Inv > 0) return Food::QuickEat(Food::SHARK);
+        return Food::QuickEat(FoodCfg);
+    } else if (Trigger)
+    {
+        Trigger = false;
+        NextCheck = NormalRandom(30, 34, 32, 32 * 0.06);
+    }
+    return false;
+}
+
+bool Gorillas::Restore()
+{
+    std::int32_t CurrentPrayer = Prayer::GetPoints();
+    static bool Trigger = false;
+    static std::int32_t NextCheck = NormalRandom(8, 18, 14, 14 * 0.06);
+
+    if (CurrentPrayer <= NextCheck)
+    {
+        if (Supplies::GetSnapshot(true).Potions_Inv_PrayerRestore.Total <= 0)
+        {
+            Trigger = false;
+            return false;
+        }
+
+        Trigger = true;
+        Script::SetStatus("Restoring prayer");
+        return Prayer::QuickDrinkRestore();
+    } else if (Trigger)
+    {
+        Trigger = false;
+        NextCheck = NormalRandom(8, 18, 14, 14 * 0.06);
+    }
+    return false;
+}
+
+bool Gorillas::Topoff(double MaxOverheal, double MaxOverrrestore)
+{
     return false;
 }
 
@@ -878,7 +1007,11 @@ bool Gorillas::Fight()
         if (!Gorilla || !*Gorilla) continue;
         if (Gorilla->IsDead()) continue;
 
-        bool CanRelax = Gorilla->AttacksUntilSwitch >= 3 && Gorilla->CountNextPossibleAttackStyles() == 1;
+        if (!Gorilla->InCombat() && !IsKeyDown(KEY_F1))
+        {
+            Wait(250);
+            continue;
+        }
 
         if (State & MELEE_MOVE)
         {
@@ -900,13 +1033,29 @@ bool Gorillas::Fight()
 
         if (State & EQUIP_MELEE || State & EQUIP_RANGED || State & EQUIP_SPECIAL)
         {
-            Gorillas::Gear(State);
+            Gorillas::Gear(State, Gorilla);
             State = Gorillas::GetState();
         }
 
-        if (State == 0)
-            Gorillas::Attack(false, true);
+        static auto LastIndex = Gorilla->GetIndex();
+        static auto LastProtectedStyle = Gorilla->GetProtectionStyle();
+        if (LastIndex != Gorilla->GetIndex())
+        {
+            LastIndex = Gorilla->GetIndex();
+            LastProtectedStyle = Gorilla->GetProtectionStyle();
+        } else
+        {
+            if (LastProtectedStyle != Gorilla->GetProtectionStyle())
+            {
+                Gorillas::Special();
+                LastProtectedStyle = Gorilla->GetProtectionStyle();
+            }
+        }
 
+        if (State == 0)
+            Gorillas::Attack(Gorilla, false, true);
+
+        bool CanRelax = Gorillas::IsAttacking() && Gorilla->AttacksUntilSwitch >= 2 && Gorilla->CountNextPossibleAttackStyles() == 1;
         if (CanRelax)
         {
             //DebugLog("Relaxing...");
@@ -934,6 +1083,8 @@ void Gorillas::Draw()
             auto BoulderMoveTile = Gorillas::GetCurrentBoulderMoveTile();
             if (BoulderMoveTile) Paint::DrawTile(*BoulderMoveTile, 200, 0, 255, 255);
         }
+
+        Paint::DrawTile(Gorillas::GetGorillaMoveTile(Current), 0, 255, 0, 255);
 
         Paint::DrawString(Gorillas::GetStateString(State), Internal::TileToMainscreen(Minimap::GetPosition(), 0, 0, 0) + Point(20, 0), 0, 255, 255, 255);
         Current->Draw(true);

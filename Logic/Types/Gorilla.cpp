@@ -79,6 +79,27 @@ WorldArea Gorilla::GetWorldArea() const
     return WorldArea(*this);
 }
 
+std::vector<WorldArea> Gorilla::GetSurroundingMovementAreas() const
+{
+    auto W = this->GetWorldArea();
+    if (!W) return std::vector<WorldArea>();
+
+    const auto CollisionFlags = Internal::GetCollisionMap(W.GetPlane()).GetFlags();
+    std::vector<WorldArea> Result = W.GetSurroundingAreas();
+    Result.erase(std::remove_if(Result.begin(), Result.end(), [&](const WorldArea& A) -> bool
+    {
+        if (A.GetSceneX() >= 0 && A.GetSceneX() < CollisionFlags.size()
+            && A.GetSceneY() >= 0 && A.GetSceneY() < CollisionFlags.size())
+        {
+            const auto Flag = CollisionFlags[A.GetSceneX()][A.GetSceneY()];
+            return (Flag == Pathfinding::CLOSED) || (Flag & Pathfinding::BLOCKED) || (Flag & Pathfinding::OCCUPIED) || (Flag & Pathfinding::SOLID);
+        }
+        return false;
+    }), Result.end());
+
+    return Result;
+}
+
 WorldArea Gorilla::GetNextTravelingPoint(const WorldArea& TargetArea, const std::vector<WorldArea>& Gorillas, const std::vector<WorldArea>& Players) const
 {
     if (!this->LastWorldArea) return WorldArea();
@@ -115,9 +136,11 @@ bool Gorilla::IsDead() const
 bool Gorilla::InCombat() const
 {
     auto AnimationID = this->GetAnimationID();
-    return this->InitiatedCombat && (
-            (this->NextAttackTick >= GameListener::GetTickCount())
-            || (AnimationID >= Globals::Gorillas::ANIMATION_DEFEND && AnimationID <= Globals::Gorillas::ANIMATION_AOE_ATTACK));
+    return this->InitiatedCombat && !this->IsDead() &&
+           (
+                   (this->NextAttackTick + 3 >= GameListener::GetTickCount())
+                   || (AnimationID >= Globals::Gorillas::ANIMATION_DEFEND && AnimationID <= Globals::Gorillas::ANIMATION_AOE_ATTACK)
+           );
 }
 
 bool Gorilla::HealthBarShowing() const

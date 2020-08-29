@@ -156,6 +156,13 @@ void Config::SetGearsets()
     {
         switch (Config::Cfg["SpecialWeapon"].as_integer<int32_t>())
         {
+            case MAGIC_SHORTBOW:
+            {
+                Special = Ranged;
+                Special.Items[Equipment::WEAPON] = GearSet::Item("Magic shortbow (i)", 12788);
+                break;
+            }
+
             case TOXIC_BLOWPIPE:
             {
                 Special = Ranged;

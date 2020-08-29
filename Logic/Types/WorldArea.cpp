@@ -603,9 +603,32 @@ WorldArea WorldArea::CalculateNextTravellingPoint(const WorldArea& Target, bool 
     return *this;
 }
 
+std::vector<WorldArea> WorldArea::GetSurroundingAreas() const
+{
+    std::vector<WorldArea> Result;
+    for (std::int32_t TX = -1; TX <= this->Width; TX++)
+    {
+        for (std::int32_t TY = -1; TY <= this->Height; TY++)
+        {
+            WorldArea A(Tile(this->X + TX, this->Y + TY, this->Plane), 1, 1);
+            if (!this->IntersectsWith(A)) Result.emplace_back(std::move(A));
+        }
+    }
+    return Result;
+}
+
 Tile WorldArea::AsTile() const
 {
     return Tile(X, Y, Plane);
+}
+
+std::vector<Tile> WorldArea::AsTiles() const
+{
+    std::vector<Tile> Result;
+    for (int TX = 0; TX < Width; TX++)
+        for (int TY = 0; TY < Height; TY++)
+            Result.emplace_back(Tile(X + TX, Y + TY, Plane));
+    return Result;
 }
 
 WorldArea::operator bool() const
@@ -622,3 +645,4 @@ WorldArea::~WorldArea()
 {
 
 }
+

@@ -71,6 +71,7 @@ namespace Supplies
         SUPPLY_POTIONS_INFO Potions_Inv_Ranging;
         SUPPLY_POTIONS_INFO Potions_Inv_SuperCombat;
         std::int32_t Food_Inv;
+        std::int32_t Sharks_Inv;
         std::int32_t HighAlchemyCasts_Inv;
         std::int32_t EmptySlots_Inv;
         std::vector<NON_SUPPLY_ITEM> NonSupplyItems_Inv;

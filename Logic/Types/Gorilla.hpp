@@ -84,6 +84,7 @@ public:
     Internal::Player GetInteractingPlayer() const;
     Tile GetTrueLocation() const;
     WorldArea GetWorldArea() const;
+    std::vector<WorldArea> GetSurroundingMovementAreas() const;
     WorldArea GetNextTravelingPoint(const WorldArea& TargetArea, const std::vector<WorldArea>& Gorillas, const std::vector<WorldArea>& Players) const;
     bool IsDead() const;
     bool InCombat() const;

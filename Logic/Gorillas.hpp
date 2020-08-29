@@ -39,16 +39,19 @@ namespace Gorillas
     std::int32_t GetProtectedStyle(const Interactable::Player& P);
 
     std::vector<WorldArea> GetValidMovementAreas();
-    std::vector<std::pair<bool, WorldArea>> GetValidMoveTiles();
-    Tile GetMeleeMoveTile();
-    Tile GetBoulderMoveTile();
+    std::vector<std::pair<bool, WorldArea>> GetValidMoveTiles(const std::shared_ptr<Gorilla>& Gorilla);
+    Tile GetMeleeMoveTile(const std::shared_ptr<Gorilla>& Gorilla);
+    Tile GetBoulderMoveTile(const std::shared_ptr<Gorilla>& Gorilla);
+    Tile GetGorillaMoveTile(const std::shared_ptr<Gorilla>& Gorilla);
     bool IsAttacking();
+    bool IsAttacking(const std::shared_ptr<Gorilla>& Gorilla);
     bool ShouldLeave();
     bool ShouldInterrupt();
 
     bool AdjustCamera();
-    bool Attack(bool Force, bool Wait = false);
+    bool Attack( const std::shared_ptr<Gorilla>& Gorilla, bool Force, bool Wait = false);
     bool SwitchPrayer(Prayer::PRAYERS Prayer, bool Force = false);
+    bool StopCasting();
 
     namespace
     {
@@ -59,16 +62,20 @@ namespace Gorillas
         std::shared_ptr<Tile> GetCurrentBoulderMoveTile() { return CurrentBoulderMoveTile; };
     }
 
-    bool MeleeMove(std::int32_t& State, const std::shared_ptr<Gorilla>& CurrentGorilla);
-    bool BoulderMove(std::int32_t& State, const std::shared_ptr<Gorilla>& CurrentGorilla);
-    bool Prayers(std::int32_t& State, const std::shared_ptr<Gorilla>& CurrentGorilla);
-    bool Gear(std::int32_t& State);
+    bool MeleeMove(std::int32_t& State, const std::shared_ptr<Gorilla>& Gorilla);
+    bool BoulderMove(std::int32_t& State, const std::shared_ptr<Gorilla>& Gorilla);
+    bool Prayers(std::int32_t& State, const std::shared_ptr<Gorilla>& Gorilla);
+    bool Gear(std::int32_t& State, const std::shared_ptr<Gorilla>& Gorilla);
+    bool Special();
+
+    bool Food(); // used in combat - returns true if it needs to/did do something
+    bool Restore();  // used in combat - returns true if it needs to/did do something
+    bool Topoff(double MaxOverheal = 0.15, double MaxOverrrestore = 0.05); // Returns true if it did do something - used outside of combat
 
     bool WalkTo();
     bool Fight();
 
     void OnGameTick();
-
 
     void Draw();
 }

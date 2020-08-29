@@ -14,6 +14,7 @@ public:
     enum SPECIAL_WEAPON
     {
         INVALID = -1,
+        MAGIC_SHORTBOW,
         TOXIC_BLOWPIPE,
         SARADOMIN_GODSWORD
     };

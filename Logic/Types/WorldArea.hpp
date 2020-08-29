@@ -68,8 +68,10 @@ public:
     bool CanTravelInDirection(std::int32_t DirectionX, std::int32_t DirectionY, const std::function<bool(const Tile&)>& Pred) const;
     WorldArea CalculateNextTravellingPoint(const WorldArea& Target, bool StopAtMeleeDistance) const;
     WorldArea CalculateNextTravellingPoint(const WorldArea& Target, bool StopAtMeleeDistance, const std::function<bool(const Tile&)>& Pred) const;
+    std::vector<WorldArea> GetSurroundingAreas() const;
 
     Tile AsTile() const;
+    std::vector<Tile> AsTiles() const;
     operator bool() const;
     bool operator==(const WorldArea& W) const;
 

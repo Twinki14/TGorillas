@@ -1049,6 +1049,7 @@ bool Gorillas::Food()
 bool Gorillas::Restore()
 {
     std::int32_t CurrentPrayer = Prayer::GetPoints();
+    //static bool Trigger = false;
     static bool Trigger = false;
     static std::int32_t NextCheck = NormalRandom(8, 18, 14, 14 * 0.06);
 

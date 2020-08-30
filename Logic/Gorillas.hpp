@@ -70,7 +70,7 @@ namespace Gorillas
 
     bool Food(); // used in combat - returns true if it needs to/did do something
     bool Restore();  // used in combat - returns true if it needs to/did do something
-    bool Topoff(double MaxOverheal = 0.15, double MaxOverrrestore = 0.05); // Returns true if it did do something - used outside of combat
+    bool TopOff(double MaxOverheal = 0.15, double MaxOverrestore = 0.05); // Returns true if it did do something - used outside of combat
 
     bool WalkTo();
     bool Fight();

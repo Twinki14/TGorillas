@@ -883,16 +883,31 @@ bool Gorillas::Gear(int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
 {
     if (State & EQUIP_MELEE)
     {
-        /* TODO
-         *  If out of range, sometimes click near gorilla
-         */
-
         if (GearSets::Sets.count("Melee"))
         {
-            // TODO Tie this to antiban task
             if (Gorilla && *Gorilla && Gorilla->InCombat())
             {
-                if (Gorilla->GetWorldArea().DistanceTo(Mainscreen::GetTrueLocation()) >= 2)
+                static auto LastPassivity = Profile::GetInt(Profile::Var_Passivity);
+                auto Passivity = Profile::GetInt(Profile::Var_Passivity);
+                if (!Antiban::Tasks.count("GORILLAS_GEAR_MOVE_MELEE") || LastPassivity != Passivity)
+                {
+                    Antiban::Task T;
+                    LastPassivity = Passivity;
+                    switch (Passivity)
+                    {
+                        // TODO Consider a new profile var - Focus maybe?
+                        case Profile::PASSIVITY_EXHILARATED: T = Antiban::Task(5000, 0.00, 0.75); break;
+                        case Profile::PASSIVITY_HYPER: T = Antiban::Task(5000, 0.00, 0.65); break;
+                        case Profile::PASSIVITY_MILD: T = Antiban::Task(5000, 0.00, 0.50); break;
+
+                        default:
+                        case Profile::PASSIVITY_MELLOW:
+                        case Profile::PASSIVITY_DISINTERESTED:  T = Antiban::Task(5000, 0.00, 0.35); break;
+                    }
+                    Antiban::Tasks.insert_or_assign("GORILLAS_GEAR_MOVE_MELEE", std::move(T));
+                }
+
+                if (Gorilla->GetWorldArea().DistanceTo(Mainscreen::GetTrueLocation()) >= 2 && Antiban::RunTask("GORILLAS_GEAR_MOVE_MELEE"))
                 {
                     auto GorillaTile = Gorillas::GetGorillaMoveTile(Gorilla);
                     if (GorillaTile && Mainscreen::ClickTileEx(GorillaTile, true))
@@ -931,27 +946,102 @@ bool Gorillas::Food()
     std::int32_t CurrentHealth = Stats::GetCurrentLevel(Stats::HITPOINTS);
     if (CurrentHealth <= 0) return false;
 
-    static bool Trigger = false;
+    static std::int32_t NextEatTick = -1;
     static std::int32_t NextCheck = NormalRandom(30, 34, 32, 32 * 0.06);
 
     if (CurrentHealth <= NextCheck)
     {
         auto Snapshot = Supplies::GetSnapshot(true);
         if (Snapshot.Food_Inv <= 0 && Snapshot.Sharks_Inv <= 0)
-        {
-            Trigger = false;
             return false;
-        }
 
-        Trigger = true;
-        Gorillas::StopCasting();
-        Script::SetStatus("Eating food");
-        if (Snapshot.Sharks_Inv > 0) return Food::QuickEat(Food::SHARK);
-        return Food::QuickEat(FoodCfg);
-    } else if (Trigger)
+        if (GameListener::GetTickCount() >= NextEatTick)
+        {
+            Gorillas::StopCasting();
+            Script::SetStatus("Eating food");
+
+            bool Clicked = false;
+            if (Snapshot.Sharks_Inv > 0)
+                Clicked = Food::QuickEat(Food::SHARK);
+            else
+                Clicked = Food::QuickEat(FoodCfg);
+
+            if (Clicked)
+            {
+                // TODO Antipattern - Change NextEatTick to something lower for low-passivity/high focus
+                static auto LastPassivity = Profile::GetInt(Profile::Var_Passivity);
+                auto Passivity = Profile::GetInt(Profile::Var_Passivity);
+                if (!Antiban::Tasks.count("GORILLAS_FOOD_SPAM") || !!Antiban::Tasks.count("GORILLAS_FOOD_EAT_TICK") || LastPassivity != Passivity)
+                {
+                    Antiban::Task Spam;
+                    Antiban::Task LowNextEatTick;
+                    LastPassivity = Passivity;
+                    switch (Passivity)
+                    {
+                        // TODO Consider a new profile var - Focus maybe?
+                        case Profile::PASSIVITY_EXHILARATED:
+                        {
+                            Spam = Antiban::Task(6000, 0.00, 0.65);
+                            LowNextEatTick = Antiban::Task(8000, 0.00, 0.45);
+                        } break;
+
+                        case Profile::PASSIVITY_HYPER:
+                        {
+                            Spam = Antiban::Task(6000, 0.00, 0.55);
+                            LowNextEatTick = Antiban::Task(8000, 0.00, 0.35);
+                        } break;
+
+                        case Profile::PASSIVITY_MILD:
+                        {
+                            Spam = Antiban::Task(6000, 0.00, 0.40);
+                            LowNextEatTick = Antiban::Task(8000, 0.00, 0.25);
+                        } break;
+
+                        default:
+                        case Profile::PASSIVITY_MELLOW:
+                        case Profile::PASSIVITY_DISINTERESTED:
+                        {
+                            Spam = Antiban::Task(6000, 0.00, 0.25);
+                            LowNextEatTick = Antiban::Task(8000, 0.00, 0.15);
+                        } break;
+                    }
+                    Antiban::Tasks.insert_or_assign("GORILLAS_FOOD_SPAM", std::move(Spam));
+                    Antiban::Tasks.insert_or_assign("GORILLAS_FOOD_EAT_TICK", std::move(LowNextEatTick));
+                }
+
+                bool SpamFood = Antiban::RunTask("GORILLAS_FOOD_SPAM");
+                bool SetLowNextEatTick = Antiban::RunTask("GORILLAS_FOOD_EAT_TICK");
+
+                if (SpamFood)
+                {
+                    Counter C(UniformRandom(3, 6));
+                    while (C.Increment())
+                    {
+                        bool Ate = false;
+                        if (Snapshot.Sharks_Inv > 0)
+                            Ate = Food::QuickEat(Food::SHARK);
+                        else
+                            Ate = Food::QuickEat(FoodCfg);
+
+                        if (Ate) Antiban::DelayFromPassivity(175, 450, 1.8, 0.10);
+                        if (CurrentHealth > NextCheck) break;
+                    }
+                }
+
+                NextEatTick = GameListener::GetTickCount() + 6;
+                if (SetLowNextEatTick) NextEatTick = GameListener::GetTickCount() + UniformRandom(1, 4);
+                return true;
+            }
+        }
+        return true;
+    } else
     {
-        Trigger = false;
-        NextCheck = NormalRandom(30, 34, 32, 32 * 0.06);
+        if (NextEatTick != -1)
+        {
+            NextEatTick = -1;
+            // TODO Antiban - Rarely change this to something higher
+            NextCheck = NormalRandom(30, 34, 32, 32 * 0.06);
+        }
     }
     return false;
 }
@@ -981,7 +1071,7 @@ bool Gorillas::Restore()
     return false;
 }
 
-bool Gorillas::Topoff(double MaxOverheal, double MaxOverrrestore)
+bool Gorillas::TopOff(double MaxOverheal, double MaxOverrestore)
 {
     return false;
 }
@@ -1007,9 +1097,12 @@ bool Gorillas::Fight()
         if (!Gorilla || !*Gorilla) continue;
         if (Gorilla->IsDead()) continue;
 
-        if (!Gorilla->InCombat() && !IsKeyDown(KEY_F1))
+        if (!Gorilla->InCombat())
         {
-            Wait(250);
+            if (IsKeyDown(KEY_F1))
+                Gorillas::Attack(Gorilla, true, true);
+            else
+                Wait(250);
             continue;
         }
 
@@ -1052,8 +1145,10 @@ bool Gorillas::Fight()
             }
         }
 
-        if (State == 0)
-            Gorillas::Attack(Gorilla, false, true);
+        if (Gorillas::Food()) continue;
+        if (Gorillas::Restore()) continue;
+
+        if (State == 0) Gorillas::Attack(Gorilla, false, true);
 
         bool CanRelax = Gorillas::IsAttacking() && Gorilla->AttacksUntilSwitch >= 2 && Gorilla->CountNextPossibleAttackStyles() == 1;
         if (CanRelax)

@@ -12,6 +12,7 @@
 #include "Logic/Listeners/GameListener.hpp"
 #include "Logic/Types/WorldArea.hpp"
 #include "Logic/Travel.hpp"
+#include "Logic/Supplies.hpp"
 
 void Setup()
 {
@@ -31,6 +32,7 @@ void PaintMethod()
 {
     Paint::Clear();
     Gorillas::Draw();
+    Paint::DrawDot(GetMousePos(), 1.5f, 153, 51, 255, 255);
     Paint::SwapBuffer();
 }
 
@@ -68,6 +70,7 @@ bool OnStart()
         Config::SetGearsets();
         Config::SetAntiban();
         Config::CacheOSRSBoxItems();
+        Supplies::SetWhitelist();
         Script::Start(PaintMethod, true);
         return true;
     }

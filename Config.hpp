@@ -56,8 +56,8 @@ public:
             { "Recharge_Blowpipe", false },
 
             { "UseHighAlchemy", false },
-            { "Loot_MinimumHighAlchemyProfit", 0 },
-            { "Loot_Blacklist", configuru::Config::array(std::vector<std::int32_t>()) },
+            { "MinimumHighAlchemyProfit", 0 },
+            { "LootBlacklist", configuru::Config::array(std::vector<std::int32_t>()) },
 
             { "Debug_Paint", false },
             { "Debug_Logging", true },

@@ -1,4 +1,5 @@
 #include <Game/Core.hpp>
+#include <TScript.hpp>
 #include "Gorilla.hpp"
 #include "../Listeners/GameListener.hpp"
 
@@ -146,6 +147,11 @@ bool Gorilla::InCombat() const
 bool Gorilla::HealthBarShowing() const
 {
     return Internal::GetHealthPercentage(*this) != -1.00;
+}
+
+double Gorilla::GetHealthPercentage() const
+{
+    return Internal::GetHealthPercentage(*this);
 }
 
 void Gorilla::SetLastWorldArea(std::shared_ptr<WorldArea> Area)

@@ -604,6 +604,7 @@ bool Gorillas::Attack( const std::shared_ptr<Gorilla>& Gorilla, bool Force, bool
 bool Gorillas::SwitchPrayer(Prayer::PRAYERS Prayer, bool Force)
 {
     if (Prayer::IsActive(Prayer)) return true;
+    if (Prayer::GetPoints() <= 0) return false;
 
     Profile::Push(Profile::Var_RawInteractableMean, 125);
     Profile::Push(Profile::Var_RawMoveMean, 75);
@@ -683,50 +684,55 @@ bool Gorillas::MeleeMove(std::int32_t& State, const std::shared_ptr<Gorilla>& Go
     if (!Antiban::Tasks.count("GORILLAS_MELEE_MOVE_OPEN_PRAYER") || LastPassivity != Passivity)
     {
         Antiban::Task T;
+        switch (Passivity)
+        {
+            // TODO Consider a new profile var - Focus maybe?
+            case Profile::PASSIVITY_EXHILARATED: T = Antiban::Task(2000, 0.00, 0.65); break;
+            case Profile::PASSIVITY_HYPER: T = Antiban::Task(2000, 0.00, 0.55); break;
+            case Profile::PASSIVITY_MILD: T = Antiban::Task(2000, 0.00, 0.45); break;
+
+            default:
+            case Profile::PASSIVITY_MELLOW:
+            case Profile::PASSIVITY_DISINTERESTED:  T = Antiban::Task(2000, 0.00, 0.35); break;
+        }
+        Antiban::Tasks.insert_or_assign("GORILLAS_MELEE_MOVE_OPEN_PRAYER", T);
+        Antiban::Tasks.insert_or_assign("GORILLAS_MELEE_MOVE_OPEN_PRAYER_AFTER", std::move(T));
+    }
+
+    if (!Antiban::Tasks.count("GORILLAS_MELEE_MOVE_FORGET_PRAYER") || LastPassivity != Passivity)
+    {
+        Antiban::Task T;
         LastPassivity = Passivity;
         switch (Passivity)
         {
             // TODO Consider a new profile var - Focus maybe?
-            // TODO This needs to be changed for this specific purpose, this is using values from switch prayer
-            case Profile::PASSIVITY_EXHILARATED: T = Antiban::Task(8000, 0.00, 0.08); break; // 30-45 times an hour
-            case Profile::PASSIVITY_HYPER: T = Antiban::Task(8000, 0.00, 0.05); break; // 20-30 times an hour
-            case Profile::PASSIVITY_MILD: T = Antiban::Task(8000, 0.00, 0.3); break; // 10-20 times an hour
+            case Profile::PASSIVITY_EXHILARATED: T = Antiban::Task(30000, 0.00, 0.25); break;
+            case Profile::PASSIVITY_HYPER: T = Antiban::Task(30000, 0.00, 0.35); break;
+            case Profile::PASSIVITY_MILD: T = Antiban::Task(30000, 0.00, 0.40); break;
 
             default:
             case Profile::PASSIVITY_MELLOW:
-            case Profile::PASSIVITY_DISINTERESTED:  T = Antiban::Task(8000, 0.00, 0.01); break; // 0-10 times an hour
+            case Profile::PASSIVITY_DISINTERESTED:  T = Antiban::Task(30000, 0.00, 0.50); break;
         }
-        Antiban::Tasks.insert_or_assign("GORILLAS_MELEE_MOVE_OPEN_PRAYER", std::move(T));
+        Antiban::Tasks.insert_or_assign("GORILLAS_MELEE_MOVE_FORGET_PRAYER", std::move(T));
     }
 
     bool OpenPrayerBefore = Antiban::RunTask("GORILLAS_MELEE_MOVE_OPEN_PRAYER");
+    bool OpenPrayerAfter = Antiban::RunTask("GORILLAS_MELEE_MOVE_OPEN_PRAYER_AFTER");
+    bool ForgetToSwitch = Antiban::RunTask("GORILLAS_MELEE_MOVE_FORGET_PRAYER");
+    bool PredictMelee = UniformRandom() <= 0.15;
     bool OpenedPrayerBefore = false;
 
     Tile LocalMoveTile;
     bool Moved = false;
     while (State & MELEE_MOVE)
     {
-        /*
-         * After clicking the move tile, sometimes open the prayer menu as if to be ready
-         */
-
         if (Terminate) return false;
         if (Combat::GetHealth() <= 0) break;
         if (!Gorilla || !*Gorilla) break;
         if (Gorilla->IsDead()) break;
 
-/*        auto GetNextGorillaTravelPoint = [&]() -> Tile
-        {
-            std::vector<WorldArea> PlayerAreas = GameListener::GetPlayerAreas();
-            std::vector<WorldArea> GorillaAreas = GameListener::GetGorillaAreas(Gorilla->GetIndex(), true);
-
-            auto NextTravelingPoint = Gorilla->GetNextTravelingPoint(Mainscreen::GetTrueLocation(), GorillaAreas, PlayerAreas);
-            return NextTravelingPoint.AsTile();
-        };
-
-        auto NextTravelingTile = GetNextGorillaTravelPoint();*/
         bool FarEnoughAway = Gorilla->GetWorldArea().DistanceTo(Mainscreen::GetTrueLocation()) >= 2; //NextTravelingTile && NextTravelingTile.DistanceFrom(Gorilla->GetTrueLocation()) >= 1.00;
-
         if (!FarEnoughAway)
         {
             if (!CurrentMeleeMoveTile || !*CurrentMeleeMoveTile || !LocalMoveTile)
@@ -746,26 +752,58 @@ bool Gorillas::MeleeMove(std::int32_t& State, const std::shared_ptr<Gorilla>& Go
                     OpenedPrayerBefore = true;
                 }
 
-                Moved = Mainscreen::ClickTileEx(LocalMoveTile);
+                Moved = Mainscreen::ClickTileEx(LocalMoveTile, true);
             }
 
             if (Moved)
             {
-                /*
-                 * TODO Antipattern
-                 * Have this use the FOCUS var or whatever instead
-                 * - "Do we pray the 'at-ranged' prayer here? or wait until numstyles becomes 1"
-                 */
+                if (OpenPrayerAfter)
+                    Prayer::Open(Profile::RollUseGametabHotKey());
 
-                if (Gorilla->CountNextPossibleAttackStyles() > 1 && Prayer::Open(Profile::RollUseGametabHotKey()))
+                if (ForgetToSwitch)
                 {
-                    if (Gorilla->NextPossibleAttackStyles & Gorilla::MAGIC_FLAG)
-                        Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MAGIC);
-                    else if (Gorilla->NextPossibleAttackStyles & Gorilla::RANGED_FLAG)
-                        Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MISSILES);
+                    if (Gorilla->CountNextPossibleAttackStyles() == 1)
+                    {
+                        if (Prayer::Open(Profile::RollUseGametabHotKey()))
+                        {
+                            if (Gorilla->NextPossibleAttackStyles & Gorilla::MAGIC_FLAG)
+                                Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MAGIC);
+                            else if (Gorilla->NextPossibleAttackStyles & Gorilla::RANGED_FLAG)
+                                Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MISSILES);
+                            else if (Gorilla->NextPossibleAttackStyles & Gorilla::MELEE_FLAG)
+                                Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MELEE);
+                        }
+                    }
+                } else
+                {
+                    if (Gorilla->CountNextPossibleAttackStyles() == 1)
+                    {
+                        if (Prayer::Open(Profile::RollUseGametabHotKey()))
+                        {
+                            if (Gorilla->NextPossibleAttackStyles & Gorilla::MAGIC_FLAG)
+                                Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MAGIC);
+                            else if (Gorilla->NextPossibleAttackStyles & Gorilla::RANGED_FLAG)
+                                Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MISSILES);
+                            else if (Gorilla->NextPossibleAttackStyles & Gorilla::MELEE_FLAG)
+                                Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MELEE);
+                        }
+                    } else
+                    {
+                        if (Prayer::Open(Profile::RollUseGametabHotKey()))
+                        {
+                            if (PredictMelee)
+                                Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MELEE);
+                            else
+                            {
+                                if (Gorilla->NextPossibleAttackStyles & Gorilla::MAGIC_FLAG)
+                                    Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MAGIC);
+                                else if (Gorilla->NextPossibleAttackStyles & Gorilla::RANGED_FLAG)
+                                    Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MISSILES);
+                            }
+                        }
+                    }
                 }
             }
-
         }
         State = Gorillas::GetState();
     }
@@ -778,7 +816,7 @@ bool Gorillas::BoulderMove(int32_t& State, const std::shared_ptr<Gorilla>& Goril
     /*
      * if we are equipped for melee, and the next traveling point will not be the boulder tile, then just click attack - DONE
      *
-     * if we are equipped ranged, but we need to switch to melee, switch to melee after clicking to move, but we need to generate a tile that can path safely to melee range if possible
+     * if we are equipped ranged, but we need to switch to melee, switch to melee after clicking to move
      *      we could switch to melee before moving, and we should sometimes for sake of anti-bot
      *
      * if we are equipped ranged, and we don't need to switch to melee, randomly decide to generate a tile > 1 distance away from the gorilla, efficiently be ready for MELEE_MOVE
@@ -867,13 +905,42 @@ bool Gorillas::Prayers(int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
             if (Prayer::IsActive(Prayer::PROTECT_FROM_MISSILES)) return true;
             if (Prayer::IsActive(Prayer::PROTECT_FROM_MAGIC)) return true;
 
-            std::int32_t MagicDefense = Gorillas::GetDefenseAgainst(MAGIC_FLAG);
-            std::int32_t RangeDefense = Gorillas::GetDefenseAgainst(RANGED_FLAG);
+            static auto LastPassivity = Profile::GetInt(Profile::Var_Passivity);
+            auto Passivity = Profile::GetInt(Profile::Var_Passivity);
+            if (!Antiban::Tasks.count("GORILLAS_PRAYERS_SMART") || LastPassivity != Passivity)
+            {
+                Antiban::Task T;
+                LastPassivity = Passivity;
+                switch (Passivity)
+                {
+                    // TODO Consider a new profile var - Focus maybe?
+                    case Profile::PASSIVITY_EXHILARATED: T = Antiban::Task(2000, 0.00, 0.90); break;
+                    case Profile::PASSIVITY_HYPER: T = Antiban::Task(2000, 0.00, 0.85); break;
+                    case Profile::PASSIVITY_MILD: T = Antiban::Task(2000, 0.00, 0.85); break;
 
-            // Set to weaker defense prayer
-            if (MagicDefense < RangeDefense)
+                    default:
+                    case Profile::PASSIVITY_MELLOW:
+                    case Profile::PASSIVITY_DISINTERESTED:  T = Antiban::Task(2000, 0.00, 0.85); break;
+                }
+                Antiban::Tasks.insert_or_assign("GORILLAS_PRAYERS_SMART", std::move(T));
+            }
+
+            bool ChooseWeakest = Antiban::RunTask("GORILLAS_PRAYERS_SMART");
+            if (ChooseWeakest)
+            {
+                std::int32_t MagicDefense = Gorillas::GetDefenseAgainst(MAGIC_FLAG);
+                std::int32_t RangeDefense = Gorillas::GetDefenseAgainst(RANGED_FLAG);
+
+                // Set to weaker defense prayer
+                if (MagicDefense < RangeDefense)
+                    return Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MAGIC);
+                return Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MISSILES);
+            } else
+            {
+                if (UniformRandom() <= 0.50)
+                    return Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MISSILES);
                 return Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MAGIC);
-            return Gorillas::SwitchPrayer(Prayer::PROTECT_FROM_MISSILES);
+            }
         }
     }
     return false;
@@ -907,7 +974,7 @@ bool Gorillas::Gear(int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
                     Antiban::Tasks.insert_or_assign("GORILLAS_GEAR_MOVE_MELEE", std::move(T));
                 }
 
-                if (Gorilla->GetWorldArea().DistanceTo(Mainscreen::GetTrueLocation()) >= 2 && Antiban::RunTask("GORILLAS_GEAR_MOVE_MELEE"))
+                if (Gorilla->GetWorldArea().DistanceTo(Mainscreen::GetTrueLocation()) > 2 && Antiban::RunTask("GORILLAS_GEAR_MOVE_MELEE"))
                 {
                     auto GorillaTile = Gorillas::GetGorillaMoveTile(Gorilla);
                     if (GorillaTile && Mainscreen::ClickTileEx(GorillaTile, true))
@@ -923,16 +990,85 @@ bool Gorillas::Gear(int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
     return false;
 }
 
-bool Gorillas::Special()
+bool Gorillas::Special(const std::shared_ptr<Gorilla>& Gorilla)
 {
-    // don't instantly activate when ready
-    // use a antiban task, run every 10-30ss if CanSpecial
-    switch (Config::Get("SpecialWeapon").as_integer<int>())
+    // TODO Add some anti-pattern here, have low passivity almost always use spec as soon as possible, while high passiv sometimes forget for awhile
+    if (Combat::IsSpecialAttacking()) return true;
+
+    static std::uint32_t NextSpecialTick = 0;
+    static std::int32_t NextSpecialEnergyRequired = 0;
+
+    static auto LastPassivity = Profile::GetInt(Profile::Var_Passivity);
+    auto Passivity = Profile::GetInt(Profile::Var_Passivity);
+    if (!Antiban::Tasks.count("GORILLAS_SPECIAL_FORGET") || LastPassivity != Passivity)
     {
-        case Config::MAGIC_SHORTBOW: break;
-        case Config::TOXIC_BLOWPIPE: break;
-        case Config::SARADOMIN_GODSWORD: break;
-        default: break;
+        Antiban::Task T;
+        switch (Passivity)
+        {
+            // TODO Consider a new profile var - Focus maybe?
+            case Profile::PASSIVITY_EXHILARATED: T = Antiban::Task(15000, 0.00, 0.15); break;
+            case Profile::PASSIVITY_HYPER: T = Antiban::Task(15000, 0.00, 0.25); break;
+            case Profile::PASSIVITY_MILD: T = Antiban::Task(15000, 0.00, 0.35); break;
+
+            default:
+            case Profile::PASSIVITY_MELLOW:
+            case Profile::PASSIVITY_DISINTERESTED:  T = Antiban::Task(15000, 0.00, 0.55); break;
+        }
+        Antiban::Tasks.insert_or_assign("GORILLAS_SPECIAL_FORGET", std::move(T));
+    }
+
+    if (GameListener::GetTickCount() >= NextSpecialTick)
+    {
+        switch (Config::Get("SpecialWeapon").as_integer<int>())
+        {
+            case Config::MAGIC_SHORTBOW:
+            {
+                if (Combat::GetSpecialAttack() < NextSpecialEnergyRequired) return false;
+                if (!GearSets::Sets.count("Special")) return false;
+                if (Gorilla->GetHealthPercentage() <= 0.05) return false;
+
+                WaitFunc(450, 50, []() -> bool { return GearSets::Sets["Special"].Equipped(); }, true);
+                if (GearSets::Sets["Special"].Equipped() && GearSets::Sets["Special"].CanSpecial())
+                {
+                    if (GearSets::Sets["Special"].UseSpecial())
+                    {
+                        NextSpecialTick = GameListener::GetTickCount() + 20;
+                        NextSpecialEnergyRequired = UniformRandom() <= 0.65 ? 55 : 50;
+                        if (Antiban::RunTask("GORILLAS_SPECIAL_FORGET")) NextSpecialEnergyRequired = NormalRandom(60, 80, 0.20);
+                        if (NextSpecialEnergyRequired < 50) NextSpecialEnergyRequired = 50;
+                        if (UniformRandom() <= 0.65) Gorillas::Attack(Gorilla, true, false);
+
+                        DebugLog("NextSpecialEnergyRequired > {}", NextSpecialEnergyRequired);
+                        return true;
+                    }
+                }
+
+            } break;
+
+            case Config::TOXIC_BLOWPIPE:
+            {
+                if (Combat::GetHealthPercentage() <= 0.65)
+                {
+                    if (!GearSets::Sets.count("Special")) return false;
+                    if (GearSets::Sets["Special"].Equipped() && GearSets::Sets["Special"].CanSpecial())
+                    {
+                        if (GearSets::Sets["Special"].UseSpecial())
+                        {
+                            NextSpecialTick = GameListener::GetTickCount() + 20;
+                            NextSpecialEnergyRequired = UniformRandom() <= 0.65 ? 55 : 50;
+                            // TODO sometimes force this we need to heal
+                            if (Antiban::RunTask("GORILLAS_SPECIAL_FORGET")) NextSpecialEnergyRequired = NormalRandom(55, 70, 0.20);
+                            if (NextSpecialEnergyRequired < 50) NextSpecialEnergyRequired = 50;
+                            if (UniformRandom() <= 0.65) Gorillas::Attack(Gorilla, true, false);
+                            return true;
+                        }
+                    }
+                }
+            } break;
+
+            case Config::SARADOMIN_GODSWORD: break;
+            default: break;
+        }
     }
     return false;
 }
@@ -946,8 +1082,8 @@ bool Gorillas::Food()
     std::int32_t CurrentHealth = Stats::GetCurrentLevel(Stats::HITPOINTS);
     if (CurrentHealth <= 0) return false;
 
-    static std::int32_t NextEatTick = -1;
-    static std::int32_t NextCheck = NormalRandom(30, 34, 32, 32 * 0.06);
+    static std::uint32_t NextEatTick = 0;
+    static std::uint32_t NextCheck = NormalRandom(31, 36, 0.20);
 
     if (CurrentHealth <= NextCheck)
     {
@@ -1014,7 +1150,7 @@ bool Gorillas::Food()
 
                 if (SpamFood)
                 {
-                    Counter C(UniformRandom(3, 6));
+                    Counter C(NormalRandom(2, 6, 0.20));
                     while (C.Increment())
                     {
                         bool Ate = false;
@@ -1029,18 +1165,17 @@ bool Gorillas::Food()
                 }
 
                 NextEatTick = GameListener::GetTickCount() + 6;
-                if (SetLowNextEatTick) NextEatTick = GameListener::GetTickCount() + UniformRandom(1, 4);
+                if (SetLowNextEatTick) NextEatTick = GameListener::GetTickCount() + NormalRandom(1, 4, 0.20);
                 return true;
             }
         }
         return true;
     } else
     {
-        if (NextEatTick != -1)
+        if (NextEatTick > 0)
         {
-            NextEatTick = -1;
-            // TODO Antiban - Rarely change this to something higher
-            NextCheck = NormalRandom(30, 34, 32, 32 * 0.06);
+            NextEatTick = 0;
+            NextCheck = NormalRandom(31, 36, 0.20);
         }
     }
     return false;
@@ -1049,25 +1184,93 @@ bool Gorillas::Food()
 bool Gorillas::Restore()
 {
     std::int32_t CurrentPrayer = Prayer::GetPoints();
-    //static bool Trigger = false;
-    static bool Trigger = false;
-    static std::int32_t NextCheck = NormalRandom(8, 18, 14, 14 * 0.06);
+
+    static std::uint32_t NextDrinkTick = 0;
+    static std::uint32_t NextCheck = NormalRandom(8, 18, 0.20);
 
     if (CurrentPrayer <= NextCheck)
     {
-        if (Supplies::GetSnapshot(true).Potions_Inv_PrayerRestore.Total <= 0)
-        {
-            Trigger = false;
+        auto Snapshot = Supplies::GetSnapshot(true);
+        if (Snapshot.Potions_Inv_PrayerRestore.Total <= 0)
             return false;
-        }
 
-        Trigger = true;
-        Script::SetStatus("Restoring prayer");
-        return Prayer::QuickDrinkRestore();
-    } else if (Trigger)
+        if (GameListener::GetTickCount() >= NextDrinkTick)
+        {
+            Gorillas::StopCasting();
+            Script::SetStatus("Drinking prayer/restore potion");
+
+            bool Clicked = Prayer::QuickDrinkRestore();
+            if (Clicked)
+            {
+                // TODO Antipattern - Change NextEatTick to something lower for low-passivity/high focus
+                static auto LastPassivity = Profile::GetInt(Profile::Var_Passivity);
+                auto Passivity = Profile::GetInt(Profile::Var_Passivity);
+                if (!Antiban::Tasks.count("GORILLAS_RESTORE_SPAM") || !!Antiban::Tasks.count("GORILLAS_RESTORE_EAT_TICK") || LastPassivity != Passivity)
+                {
+                    Antiban::Task Spam;
+                    Antiban::Task LowNextEatTick;
+                    LastPassivity = Passivity;
+                    switch (Passivity)
+                    {
+                        // TODO Consider a new profile var - Focus maybe?
+                        case Profile::PASSIVITY_EXHILARATED:
+                        {
+                            Spam = Antiban::Task(6000, 0.00, 0.65);
+                            LowNextEatTick = Antiban::Task(8000, 0.00, 0.45);
+                        } break;
+
+                        case Profile::PASSIVITY_HYPER:
+                        {
+                            Spam = Antiban::Task(6000, 0.00, 0.55);
+                            LowNextEatTick = Antiban::Task(8000, 0.00, 0.35);
+                        } break;
+
+                        case Profile::PASSIVITY_MILD:
+                        {
+                            Spam = Antiban::Task(6000, 0.00, 0.40);
+                            LowNextEatTick = Antiban::Task(8000, 0.00, 0.25);
+                        } break;
+
+                        default:
+                        case Profile::PASSIVITY_MELLOW:
+                        case Profile::PASSIVITY_DISINTERESTED:
+                        {
+                            Spam = Antiban::Task(6000, 0.00, 0.25);
+                            LowNextEatTick = Antiban::Task(8000, 0.00, 0.15);
+                        } break;
+                    }
+                    Antiban::Tasks.insert_or_assign("GORILLAS_RESTORE_SPAM", std::move(Spam));
+                    Antiban::Tasks.insert_or_assign("GORILLAS_RESTORE_EAT_TICK", std::move(LowNextEatTick));
+                }
+
+                bool SpamDrink = Antiban::RunTask("GORILLAS_RESTORE_SPAM");
+                bool SetLowNextDrinkTick = Antiban::RunTask("GORILLAS_RESTORE_EAT_TICK");
+
+                if (SpamDrink)
+                {
+                    Counter C(UniformRandom(3, 6));
+                    while (C.Increment())
+                    {
+                        bool Drank = Prayer::QuickDrinkRestore();
+
+                        if (Drank) Antiban::DelayFromPassivity(175, 450, 1.8, 0.10);
+                        if (CurrentPrayer > NextCheck) break;
+                    }
+                }
+
+                NextDrinkTick = GameListener::GetTickCount() + 6;
+                if (SetLowNextDrinkTick) NextDrinkTick = GameListener::GetTickCount() + UniformRandom(1, 4);
+                return true;
+            }
+        }
+        return true;
+    } else
     {
-        Trigger = false;
-        NextCheck = NormalRandom(8, 18, 14, 14 * 0.06);
+        if (NextDrinkTick > 0)
+        {
+            NextDrinkTick = 0;
+            NextCheck = NormalRandom(8, 18, 0.20);
+        }
     }
     return false;
 }
@@ -1100,12 +1303,15 @@ bool Gorillas::Fight()
 
         if (!Gorilla->InCombat())
         {
-            if (IsKeyDown(KEY_F1))
+            // TODO when moving this to proper loop, have attack below all the state checks
+            if (IsKeyDown(KEY_CTRL))
                 Gorillas::Attack(Gorilla, true, true);
             else
                 Wait(250);
             continue;
         }
+
+        bool SwitchedGear = false;
 
         if (State & MELEE_MOVE)
         {
@@ -1127,7 +1333,7 @@ bool Gorillas::Fight()
 
         if (State & EQUIP_MELEE || State & EQUIP_RANGED || State & EQUIP_SPECIAL)
         {
-            Gorillas::Gear(State, Gorilla);
+            SwitchedGear = Gorillas::Gear(State, Gorilla);
             State = Gorillas::GetState();
         }
 
@@ -1141,7 +1347,10 @@ bool Gorillas::Fight()
         {
             if (LastProtectedStyle != Gorilla->GetProtectionStyle())
             {
-                Gorillas::Special();
+                DebugLog("New protection style, {}", SwitchedGear);
+                if (SwitchedGear)
+                    WaitFunc(1250, 50, []() -> bool { return GearSets::Sets["Special"].Equipped(); }, true);
+                Gorillas::Special(Gorilla);
                 LastProtectedStyle = Gorilla->GetProtectionStyle();
             }
         }
@@ -1179,8 +1388,6 @@ void Gorillas::Draw()
             auto BoulderMoveTile = Gorillas::GetCurrentBoulderMoveTile();
             if (BoulderMoveTile) Paint::DrawTile(*BoulderMoveTile, 200, 0, 255, 255);
         }
-
-        Paint::DrawTile(Gorillas::GetGorillaMoveTile(Current), 0, 255, 0, 255);
 
         Paint::DrawString(Gorillas::GetStateString(State), Internal::TileToMainscreen(Minimap::GetPosition(), 0, 0, 0) + Point(20, 0), 0, 255, 255, 255);
         Current->Draw(true);

@@ -49,7 +49,7 @@ namespace Gorillas
     bool ShouldInterrupt();
 
     bool AdjustCamera();
-    bool Attack( const std::shared_ptr<Gorilla>& Gorilla, bool Force, bool Wait = false);
+    bool Attack(const std::shared_ptr<Gorilla>& Gorilla, bool Force, bool Wait = false);
     bool SwitchPrayer(Prayer::PRAYERS Prayer, bool Force = false);
     bool StopCasting();
 
@@ -66,7 +66,7 @@ namespace Gorillas
     bool BoulderMove(std::int32_t& State, const std::shared_ptr<Gorilla>& Gorilla);
     bool Prayers(std::int32_t& State, const std::shared_ptr<Gorilla>& Gorilla);
     bool Gear(std::int32_t& State, const std::shared_ptr<Gorilla>& Gorilla);
-    bool Special();
+    bool Special(const std::shared_ptr<Gorilla>& Gorilla);
 
     bool Food(); // used in combat - returns true if it needs to/did do something
     bool Restore();  // used in combat - returns true if it needs to/did do something

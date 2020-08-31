@@ -57,8 +57,8 @@ std::vector<Supplies::NON_SUPPLY_ITEM> GetNonSupplyItems(const std::vector<CONTA
         NonSupplyItem.HighAlchProfit = 0;
         NonSupplyItem.ShouldAlch = false;
 
-        static const auto UseHighAlchemy = Config::Get("Loot_UseHighAlchemy").as_bool();
-        static const auto MinimumHighAlchemyProfit = Config::Get("Loot_MinimumHighAlchemyProfit").as_integer<int>();
+        static const auto UseHighAlchemy = Config::Get("UseHighAlchemy").as_bool();
+        static const auto MinimumHighAlchemyProfit = Config::Get("MinimumHighAlchemyProfit").as_integer<int>();
         if (NonSupplyItem.ExchangeValue > 0 && NonSupplyItem.HighAlchValue > 0 && !NonSupplyItem.Stackable)
         {
             NonSupplyItem.HighAlchProfit = (NonSupplyItem.HighAlchValue + Prices::GetHighAlchemyCost(Globals::ITEM_LAVA_RUNE_ID)) - NonSupplyItem.ExchangeValue;
@@ -109,17 +109,25 @@ Supplies::SUPPLY_ITEMS_SNAPSHOT Supplies::GetSnapshot(bool InventoryOnly)
         Result.SpecialSet_Equipped = GearSets::Sets["Special"].Equipped();
     }
 
-    Result.HasRunePouch_Inv = Inventory::Count(Globals::ITEM_RUNE_POUCH, InventoryContainerItems) > 0;
-    Result.HasRoyalSeedPod_Inv = Inventory::Count(Globals::ITEM_ROYAL_SEED_POD, InventoryContainerItems) > 0;
+    Result.HasRunePouch_Inv     = Inventory::Count(Globals::ITEM_RUNE_POUCH, InventoryContainerItems) > 0;
+    Result.HasRoyalSeedPod_Inv  = Inventory::Count(Globals::ITEM_ROYAL_SEED_POD, InventoryContainerItems) > 0;
 
-    Result.Potions_Inv_PrayerRestore    = CountPotions((UsePrayerPots) ? Globals::ITEM_PRAYER_POTION : Globals::ITEM_SUPER_RESTORE, InventoryContainerItems, true);
-    Result.Potions_Inv_Ranging          = CountPotions((UseDivinePots) ? Globals::ITEM_DIVINE_RANGING_POTION: Globals::ITEM_RANGING_POTION, InventoryContainerItems, true);
-    Result.Potions_Inv_SuperCombat      = CountPotions((UseDivinePots) ? Globals::ITEM_DIVINE_SUPER_COMBAT_POTION : Globals::ITEM_SUPER_COMBAT_POTION, InventoryContainerItems, true);
-    Result.Food_Inv = Inventory::Count(FoodID, InventoryContainerItems);
-    Result.Sharks_Inv = Inventory::Count(SharkID, InventoryContainerItems);
+    Result.Potions_Inv_Restore  = CountPotions(Globals::ITEM_SUPER_RESTORE, InventoryContainerItems, true);
+    Result.Potions_Inv_Prayer   = CountPotions(Globals::ITEM_PRAYER_POTION, InventoryContainerItems, true);
+    Result.Potions_Inv_PrayerRestore =
+            { Result.Potions_Inv_Restore.Total + Result.Potions_Inv_Prayer.Total,
+              Result.Potions_Inv_Restore.Dose_1 + Result.Potions_Inv_Prayer.Dose_1,
+              Result.Potions_Inv_Restore.Dose_2 + Result.Potions_Inv_Prayer.Dose_2,
+              Result.Potions_Inv_Restore.Dose_3 + Result.Potions_Inv_Prayer.Dose_3,
+              Result.Potions_Inv_Restore.Dose_4 + Result.Potions_Inv_Prayer.Dose_4, };
+
+    Result.Potions_Inv_Ranging      = CountPotions((UseDivinePots) ? Globals::ITEM_DIVINE_RANGING_POTION : Globals::ITEM_RANGING_POTION, InventoryContainerItems, true);
+    Result.Potions_Inv_SuperCombat  = CountPotions((UseDivinePots) ? Globals::ITEM_DIVINE_SUPER_COMBAT_POTION : Globals::ITEM_SUPER_COMBAT_POTION, InventoryContainerItems, true);
+    Result.Food_Inv     = Inventory::Count(FoodID, InventoryContainerItems);
+    Result.Sharks_Inv   = Inventory::Count(SharkID, InventoryContainerItems);
     Result.HighAlchemyCasts_Inv = CountAlchemyCasts();
     Result.EmptySlots_Inv = Inventory::CountEmpty();
-    Result.NonSupplyItems_Inv = GetNonSupplyItems(InventoryContainerItems);
+    //Result.NonSupplyItems_Inv = GetNonSupplyItems(InventoryContainerItems); TODO
 
     if (BankOpen)
     {
@@ -127,7 +135,7 @@ Supplies::SUPPLY_ITEMS_SNAPSHOT Supplies::GetSnapshot(bool InventoryOnly)
         Result.HasRoyalSeedPod_Bank = Bank::Count(Globals::ITEM_ROYAL_SEED_POD, InventoryContainerItems) > 0;
 
         Result.Potions_Bank_PrayerRestore   = CountPotions((UsePrayerPots) ? Globals::ITEM_PRAYER_POTION : Globals::ITEM_SUPER_RESTORE, BankContainerItems, false);
-        Result.Potions_Bank_Ranging         = CountPotions((UseDivinePots) ? Globals::ITEM_DIVINE_RANGING_POTION: Globals::ITEM_RANGING_POTION, BankContainerItems, false);
+        Result.Potions_Bank_Ranging         = CountPotions((UseDivinePots) ? Globals::ITEM_DIVINE_RANGING_POTION : Globals::ITEM_RANGING_POTION, BankContainerItems, false);
         Result.Potions_Bank_SuperCombat     = CountPotions((UseDivinePots) ? Globals::ITEM_DIVINE_SUPER_COMBAT_POTION : Globals::ITEM_SUPER_COMBAT_POTION, BankContainerItems, false);
         Result.Food_Inv = Bank::Count(FoodID, BankContainerItems);
     }
@@ -149,7 +157,7 @@ void Supplies::SetWhitelist()
     const auto UsePrayerPots = Config::Get("UsePrayerPots").as_bool();
     const auto UseDivinePots = Config::Get("UseDivinePots").as_bool();
     const auto UseRunePouch = Config::Get("UseRunePouch").as_bool();
-    const auto Loot_UseHighAlchemy = Config::Get("Loot_UseHighAlchemy").as_bool();
+    const auto UseHighAlchemy = Config::Get("UseHighAlchemy").as_bool();
 
     Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.clear();
     Supplies::SUPPLY_ITEMS_WHITELIST_ITEM_IDS.clear();

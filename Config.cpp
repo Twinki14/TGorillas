@@ -154,6 +154,9 @@ void Config::SetGearsets()
 
     if (Config::Cfg.count("SpecialWeapon"))
     {
+        if (Ranged.Items[Equipment::WEAPON].Name == "Magic shortbow (i)") Config::Cfg["SpecialWeapon"] = MAGIC_SHORTBOW;
+        if (Ranged.Items[Equipment::WEAPON].Name == "Toxic blowpipe") Config::Cfg["SpecialWeapon"] = TOXIC_BLOWPIPE;
+
         switch (Config::Cfg["SpecialWeapon"].as_integer<int32_t>())
         {
             case MAGIC_SHORTBOW:
@@ -210,8 +213,8 @@ void Config::SetAntiban()
 
     Profile::Set(Profile::Var_UseHotkeys_EscCloseInterface, Config::Get("UseHotkeys_Esc").as_bool());
     Profile::Set(Profile::Var_UseHotkeys_Gametabs, Config::Get("UseHotkeys_Gametabs").as_bool());
-    Profile::Set(Profile::Var_UseHotkeys_EscCloseInterface_Chance, 0.80);
-    Profile::Set(Profile::Var_UseHotkeys_Gametabs_Chance, 0.80);
+    Profile::Set(Profile::Var_UseHotkeys_EscCloseInterface_Chance, 0.95);
+    Profile::Set(Profile::Var_UseHotkeys_Gametabs_Chance, 0.96);
 }
 
 

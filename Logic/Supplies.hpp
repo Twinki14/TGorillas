@@ -67,6 +67,8 @@ namespace Supplies
         bool HasRunePouch_Inv = false;
         bool HasRoyalSeedPod_Inv = false;
 
+        SUPPLY_POTIONS_INFO Potions_Inv_Restore;
+        SUPPLY_POTIONS_INFO Potions_Inv_Prayer;
         SUPPLY_POTIONS_INFO Potions_Inv_PrayerRestore;
         SUPPLY_POTIONS_INFO Potions_Inv_Ranging;
         SUPPLY_POTIONS_INFO Potions_Inv_SuperCombat;

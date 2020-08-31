@@ -89,6 +89,7 @@ public:
     bool IsDead() const;
     bool InCombat() const;
     bool HealthBarShowing() const;
+    double GetHealthPercentage() const;
 
     void SetLastWorldArea(std::shared_ptr<WorldArea> Area);
     std::shared_ptr<WorldArea> GetLastWorldArea() const;

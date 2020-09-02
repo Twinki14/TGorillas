@@ -152,17 +152,19 @@ Supplies::SUPPLY_ITEMS_SNAPSHOT Supplies::GetSnapshot(bool InventoryOnly)
 
 void Supplies::SetWhitelist()
 {
-    const auto SpecialWeapon = Config::Get("SpecialWeapon").as_integer<int>();
     const auto StatRefreshMethod = Config::Get("StatRefreshMethod").as_integer<int>();
-    const auto UsePrayerPots = Config::Get("UsePrayerPots").as_bool();
     const auto UseDivinePots = Config::Get("UseDivinePots").as_bool();
     const auto UseRunePouch = Config::Get("UseRunePouch").as_bool();
     const auto UseHighAlchemy = Config::Get("UseHighAlchemy").as_bool();
+    const auto FoodCfg = (Food::FOOD) Config::Get("Food").as_integer<int>();
 
     Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.clear();
     Supplies::SUPPLY_ITEMS_WHITELIST_ITEM_IDS.clear();
 
-    for (auto& D : Globals::GetDegradableArray(UsePrayerPots ? Globals::ITEM_PRAYER_POTION : Globals::ITEM_SUPER_RESTORE, 1, 4))
+    for (auto& D : Globals::GetDegradableArray(Globals::ITEM_PRAYER_POTION, 1, 4))
+        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(std::move(D));
+
+    for (auto& D : Globals::GetDegradableArray(Globals::ITEM_SUPER_RESTORE, 1, 4))
         Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(std::move(D));
 
     for (auto& D : Globals::GetDegradableArray((UseDivinePots) ? Globals::ITEM_DIVINE_RANGING_POTION : Globals::ITEM_RANGING_POTION, 1, 4))
@@ -176,7 +178,14 @@ void Supplies::SetWhitelist()
         for (std::uint32_t I = Equipment::HEAD; I <= Equipment::AMMO; I++)
         {
             if (GearSets::Sets["Melee"].Items[I].Name != "NULL")
-                Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(GearSets::Sets["Melee"].Items[I].Name);
+            {
+                if (GearSets::Sets["Melee"].Items[I].Degradable && !GearSets::Sets["Melee"].Items[I].DegradableNames.empty())
+                    for (const auto& D : GearSets::Sets["Melee"].Items[I].DegradableNames)
+                        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(D);
+                else
+                    Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(GearSets::Sets["Melee"].Items[I].Name);
+            }
+
         }
     }
 
@@ -185,7 +194,13 @@ void Supplies::SetWhitelist()
         for (std::uint32_t I = Equipment::HEAD; I <= Equipment::AMMO; I++)
         {
             if (GearSets::Sets["Ranged"].Items[I].Name != "NULL")
-                Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(GearSets::Sets["Ranged"].Items[I].Name);
+            {
+                if (GearSets::Sets["Ranged"].Items[I].Degradable && !GearSets::Sets["Ranged"].Items[I].DegradableNames.empty())
+                    for (const auto& D : GearSets::Sets["Ranged"].Items[I].DegradableNames)
+                        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(D);
+                else
+                    Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(GearSets::Sets["Ranged"].Items[I].Name);
+            }
         }
     }
 
@@ -208,6 +223,9 @@ void Supplies::SetWhitelist()
     }
 
     if (UseRunePouch) Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(Globals::ITEM_RUNE_POUCH);
+
+    Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(Food::GetName(FoodCfg));
+    Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(Food::GetName(Food::SHARK));
     Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(Globals::ITEM_ROYAL_SEED_POD);
 }
 

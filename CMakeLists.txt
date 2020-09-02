@@ -137,7 +137,7 @@ set(SOURCE_FILES
         Libs/imgui/imgui_widgets.cpp
         Libs/imgui/imstb_rectpack.h
         Libs/imgui/imstb_textedit.h
-        Libs/imgui/imstb_truetype.h)
+        Libs/imgui/imstb_truetype.h Logic/Tracker.cpp Logic/Tracker.hpp)
 
 # Set directories
 set(ALPACABOT_DIRECTORY $ENV{HOMEDRIVE}$ENV{HOMEPATH}\\AlpacaBot)

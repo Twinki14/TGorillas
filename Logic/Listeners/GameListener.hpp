@@ -38,6 +38,7 @@ public:
     static std::uint32_t GetTickCount();
     static std::int64_t GetLastTickTime();
     static std::int64_t GetTimeSinceLastTick();
+    static Box GetPaintStatusBox();
 
 private:
 
@@ -61,6 +62,8 @@ private:
     static void ClearRecentBoulders();
     static void ClearCurrentGorilla();
 
+    static void CheckPaintStatusBox();
+
     void OnStart() override;
     static void Loop();
 
@@ -74,6 +77,9 @@ private:
     static void OnPlayerUnloaded(const std::shared_ptr<TrackedPlayer>& P, std::int32_t Index);
     static void OnHitsplat(const std::shared_ptr<TrackedPlayer>& P, Hitsplat& H);
     static void OnProjectile(Interactable::Projectile& P);
+
+    inline static std::mutex MiscLock;
+    inline static Box PaintStatusBox = Box(-1, -1, 509, 25);
 
     inline static std::atomic<bool> ProcessGameTick = false;
     inline static std::atomic<std::uint32_t> TickCount = 0;

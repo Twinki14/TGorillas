@@ -196,6 +196,15 @@ void DrawTab_GUI()
 
 void GUI::DrawPane_Script()
 {
+    static float TextV4[4] = { (float) TextColor.Red / 255.0f, (float) TextColor.Green / 255.0f, (float) TextColor.Blue / 255.0f, (float) TextColor.Alpha / 255.0f };
+
+    if (ImGui::ColorEdit4("TextColor", (float*)&TextV4))
+    {
+        MiscLock.lock();
+        TextColor = { static_cast<uint8_t>(TextV4[0] * 255), static_cast<uint8_t>(TextV4[1] * 255), static_cast<uint8_t>(TextV4[2] * 255), static_cast<uint8_t>(TextV4[3] * 255) };
+        MiscLock.unlock();
+    }
+
     constexpr const char* PassivityStrings[] = { "Exhilarated", "Hyper", "Mild", "Mellow", "Disinterested" };
     constexpr const char* FrequencyStrings[] = { "Never", "Rarely", "Regularly", "Frequently", "Very frequently" };
     constexpr const char* TendencyStrings[] = { "Very low", "Low", "Normal", "High", "Very high" };

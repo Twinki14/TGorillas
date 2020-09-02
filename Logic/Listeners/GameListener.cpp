@@ -6,6 +6,7 @@
 #include <functional>
 #include <Game/Interfaces/Mainscreen.hpp>
 #include <Utilities/Mainscreen.hpp>
+#include <Game/Tools/Widgets.hpp>
 
 GameListener& GameListener::Instance()
 {
@@ -656,6 +657,26 @@ void GameListener::ClearCurrentGorilla()
     }
 }
 
+void GameListener::CheckPaintStatusBox()
+{
+    auto StartB = Box(0, 0, 509, 25);
+    const auto ChatWidget = Widgets::Get(162, 38); // 162, 5
+    if (ChatWidget.IsVisible())
+    {
+        const auto B = ChatWidget.GetBox();
+        StartB.X = B.X + 5;
+        StartB.Y = B.Y - 25;
+    } else
+    {
+        const auto AllButtonWidget = Widgets::Get(162, 5);
+        const auto B = AllButtonWidget.GetBox();
+        StartB.X = B.X + 5;
+        StartB.Y = B.Y - 35;
+    }
+    std::lock_guard<std::mutex> Lock(MiscLock);
+    PaintStatusBox = std::move(StartB);
+}
+
 void GameListener::OnStart()
 {
     //GameListener::LastTickTime = CurrentTimeMillis();
@@ -705,6 +726,7 @@ void GameListener::OnGameTick()
         if (Travel::InCavern())
             GameListener::CheckCurrentGorilla();
     }
+    GameListener::CheckPaintStatusBox();
 }
 
 void GameListener::OnNPCUpdate(std::vector<Internal::NPC>& NPCs, std::vector<std::int32_t>& NPCIndices)
@@ -1126,8 +1148,18 @@ std::int64_t GameListener::GetTimeSinceLastTick()
     return LastTickTime - CurrentTimeMillis();
 }
 
+Box GameListener::GetPaintStatusBox()
+{
+    std::lock_guard<std::mutex> Lock(MiscLock);
+    return PaintStatusBox;
+}
+
 GameListener::GameListener() : LoopTask("GameListener", std::chrono::milliseconds(20), GameListener::Loop)
 {
 
 }
+
+
+
+
 

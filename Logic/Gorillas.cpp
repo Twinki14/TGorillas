@@ -69,14 +69,14 @@ std::string Gorillas::GetStateString(std::int32_t State)
     if (State < 0) State = Gorillas::GetState();
 
     std::string Str;
-    if (State & Gorillas::MELEE_MOVE) Str += "MELEE_MOVE\n";
-    if (State & Gorillas::BOULDER) Str += "BOULDER\n";
-    if (State & Gorillas::SWITCH_PRAYER_MELEE) Str += "SWITCH_PRAYER_MELEE\n";
-    if (State & Gorillas::SWITCH_PRAYER_RANGED) Str += "SWITCH_PRAYER_RANGED\n";
-    if (State & Gorillas::SWITCH_PRAYER_MAGIC) Str += "SWITCH_PRAYER_MAGIC\n";
-    if (State & Gorillas::EQUIP_MELEE) Str += "EQUIP_MELEE\n";
-    if (State & Gorillas::EQUIP_RANGED) Str += "EQUIP_RANGED\n";
-    if (State & Gorillas::EQUIP_SPECIAL) Str += "EQUIP_SPECIAL\n";
+    if (State & Gorillas::MELEE_MOVE)           Str  += "MELEE_MOVE\n";
+    if (State & Gorillas::BOULDER)              Str  += "BOULDER\n";
+    if (State & Gorillas::SWITCH_PRAYER_MELEE)  Str  += "SWITCH_PRAYER_MELEE\n";
+    if (State & Gorillas::SWITCH_PRAYER_RANGED) Str  += "SWITCH_PRAYER_RANGED\n";
+    if (State & Gorillas::SWITCH_PRAYER_MAGIC)  Str  += "SWITCH_PRAYER_MAGIC\n";
+    if (State & Gorillas::EQUIP_MELEE)          Str  += "EQUIP_MELEE\n";
+    if (State & Gorillas::EQUIP_RANGED)         Str  += "EQUIP_RANGED\n";
+    if (State & Gorillas::EQUIP_SPECIAL)        Str  += "EQUIP_SPECIAL\n";
     return Str;
 }
 
@@ -577,6 +577,16 @@ bool Gorillas::AdjustCamera()
     return false;
 }
 
+bool Gorillas::AdjustZoom()
+{
+    return false;
+}
+
+bool Gorillas::Relax()
+{
+    return false;
+}
+
 bool Gorillas::Attack( const std::shared_ptr<Gorilla>& Gorilla, bool Force, bool Wait)
 {
     if (!Gorilla || !*Gorilla || Gorilla->IsDead()) return false;
@@ -990,7 +1000,7 @@ bool Gorillas::Gear(int32_t& State, const std::shared_ptr<Gorilla>& Gorilla)
     return false;
 }
 
-bool Gorillas::Special(const std::shared_ptr<Gorilla>& Gorilla)
+bool Gorillas::Special(const std::shared_ptr<Gorilla>& Gorilla, bool RecentlySwitchedGear)
 {
     // TODO Add some anti-pattern here, have low passivity almost always use spec as soon as possible, while high passiv sometimes forget for awhile
     if (Combat::IsSpecialAttacking()) return true;
@@ -1027,7 +1037,13 @@ bool Gorillas::Special(const std::shared_ptr<Gorilla>& Gorilla)
                 if (!GearSets::Sets.count("Special")) return false;
                 if (Gorilla->GetHealthPercentage() <= 0.05) return false;
 
-                WaitFunc(450, 50, []() -> bool { return GearSets::Sets["Special"].Equipped(); }, true);
+                if (RecentlySwitchedGear)
+                {
+                    bool Waited = WaitFunc(1250, 75, []() -> bool { return GearSets::Sets["Special"].Equipped(); }, true);
+                    DebugLog("Gear wait > ", Waited);
+                }
+
+                DebugLog("Equipped > {} CanSpecial > {}", GearSets::Sets["Special"].Equipped(), GearSets::Sets["Special"].CanSpecial());
                 if (GearSets::Sets["Special"].Equipped() && GearSets::Sets["Special"].CanSpecial())
                 {
                     if (GearSets::Sets["Special"].UseSpecial())
@@ -1348,9 +1364,7 @@ bool Gorillas::Fight()
             if (LastProtectedStyle != Gorilla->GetProtectionStyle())
             {
                 DebugLog("New protection style, {}", SwitchedGear);
-                if (SwitchedGear)
-                    WaitFunc(1250, 50, []() -> bool { return GearSets::Sets["Special"].Equipped(); }, true);
-                Gorillas::Special(Gorilla);
+                Gorillas::Special(Gorilla, SwitchedGear);
                 LastProtectedStyle = Gorilla->GetProtectionStyle();
             }
         }
@@ -1363,10 +1377,11 @@ bool Gorillas::Fight()
         bool CanRelax = Gorillas::IsAttacking() && Gorilla->AttacksUntilSwitch >= 2 && Gorilla->CountNextPossibleAttackStyles() == 1;
         if (CanRelax)
         {
-            //DebugLog("Relaxing...");
+            Gorillas::AdjustCamera();
+            Gorillas::AdjustZoom();
+            Gorillas::Relax(); // antiban stuff like tabbing out
         }
     }
-    GameListener::Instance().Stop(true);
     return true;
 }
 

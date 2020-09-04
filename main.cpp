@@ -37,23 +37,33 @@ void PaintMethod()
 {
     Paint::Clear();
 
+    bool LoggedIn = Mainscreen::IsLoggedIn();
+    std:int32_t LeftStartX = LoggedIn ? 5 : Internal::GetLoginScreenX() + 5;
+
     Paint::Pixel BaseTextColor = { 0, 214, 0, 255};  //GUI::GetTextColor();
 
     auto StatusBox = GameListener::GetPaintStatusBox();
-    if (StatusBox.X < 0 || StatusBox.Y < 0)
+    if (StatusBox.X < 0 || StatusBox.Y < 0 || !LoggedIn)
     {
-        const auto ChatWidget = Widgets::Get(162, 38); // 162, 5
-        if (ChatWidget.IsVisible())
+        if (!LoggedIn)
         {
-            const auto B = ChatWidget.GetBox();
-            StatusBox.X = B.X + 5;
-            StatusBox.Y = B.Y - 25;
+            StatusBox.X = LeftStartX;
+            StatusBox.Y = 435;
         } else
         {
-            const auto AllButtonWidget = Widgets::Get(162, 5);
-            const auto B = AllButtonWidget.GetBox();
-            StatusBox.X = B.X + 5;
-            StatusBox.Y = B.Y - 35;
+            const auto ChatWidget = Widgets::Get(162, 38); // 162, 5
+            if (ChatWidget.IsVisible())
+            {
+                const auto B = ChatWidget.GetBox();
+                StatusBox.X = B.X + 5;
+                StatusBox.Y = B.Y - 25;
+            } else
+            {
+                const auto AllButtonWidget = Widgets::Get(162, 5);
+                const auto B = AllButtonWidget.GetBox();
+                StatusBox.X = B.X + 5;
+                StatusBox.Y = B.Y - 35;
+            }
         }
     }
 
@@ -61,15 +71,15 @@ void PaintMethod()
     Paint::DrawBox(StatusBox, 77, 77, 77, 255);
     Paint::DrawString("Status - " + Script::GetStatus(), Point(StatusBox.X + 5, StatusBox.Y + 5), BaseTextColor.Red, BaseTextColor.Green, BaseTextColor.Blue, BaseTextColor.Alpha);
 
-    const auto TitleBox = Box(5, 20, 185, 25);
-    const auto CoinsBox = Box(5, TitleBox.GetY2() + 5, TitleBox.Width, 35);
-    const auto StatsBox = Box(5, CoinsBox.GetY2() + 5, TitleBox.Width, 69);
+    const auto TitleBox = Box(LeftStartX, 20, 185, 25);
+    const auto CoinsBox = Box(LeftStartX, TitleBox.GetY2() + 5, TitleBox.Width, 35);
+    const auto StatsBox = Box(LeftStartX, CoinsBox.GetY2() + 5, TitleBox.Width, 69);
 
     const std::string TitleStr = "TGorillas | " + MillisToHumanShort(Script::GetTimeElapsed());
 
     const auto TotalLootProfit = 0; //Tracker::GetTotalProfit();
     const std::string CoinsStr = Script::Tools::FormatRunescapeGold(TotalLootProfit) + " [" + Script::Tools::FormatRunescapeGold(Script::Tools::ToHour(0, TotalLootProfit)) + " p/h]";
-    const auto CoinsStart = Point((CoinsBox.GetX2() / 2) - ((BITMAP_COINS.GetWidth() + (CoinsStr.size() * 7) + 6) / 2), CoinsBox.Y + 5);
+    const auto CoinsStart = Point((CoinsBox.GetMiddle().X) - ((BITMAP_COINS.GetWidth() + (CoinsStr.size() * 7) + 6) / 2), CoinsBox.Y + 5);
 
     Paint::Pixel CoinsColor = { 255, 255, 255, 255 };
     if (((double) TotalLootProfit / 1000000.0) >= 1.00)
@@ -93,7 +103,7 @@ void PaintMethod()
 
     Paint::DrawSquare(TitleBox, 77, 77, 77, 50);
     Paint::DrawBox(TitleBox, 77, 77, 77, 255);
-    Paint::DrawString(TitleStr, Point( ((TitleBox.GetX2() / 2) - (TitleStr.size() * 3)), TitleBox.Y + 6), BaseTextColor.Red, BaseTextColor.Green, BaseTextColor.Blue, BaseTextColor.Alpha);
+    Paint::DrawString(TitleStr, Point( ((TitleBox.GetMiddle().X) - (TitleStr.size() * 3)), TitleBox.Y + 6), BaseTextColor.Red, BaseTextColor.Green, BaseTextColor.Blue, BaseTextColor.Alpha);
 
     Paint::DrawSquare(CoinsBox, 77, 77, 77, 50);
     Paint::DrawBox(CoinsBox, 77, 77, 77, 255);
@@ -109,12 +119,54 @@ void PaintMethod()
     Paint::DrawLine(Point(StatsBox.X, StatsBox.Y + 46), Point(StatsBox.GetX2(), StatsBox.Y + 46), 77, 77, 77, 125);
     Paint::DrawString(DiedStr, Point(StatsBox.X + 5, StatsBox.Y + 50), DeathColor.Red, DeathColor.Green, DeathColor.Blue, DeathColor.Alpha);
 
-    //Paint::DrawLine(Point(InfoBox.X, InfoBox.Y + 35), Point(InfoBox.GetX2(), InfoBox.Y + 35), 77, 77, 77, 125);
+    auto AccountBox = Box(StatusBox.X, StatusBox.Y - 195, 225, 184);
+    static auto RawUsername = LoggedIn ? Internal::GetUsername() : "-----";
+    static auto RunescapeUsername = LoggedIn ? Internal::GetLocalPlayer().GetNamePair().GetCleanName() : "-----";
+    if (LoggedIn && (RawUsername == "-----" || RunescapeUsername == "-----" || RawUsername.empty() || RunescapeUsername.empty()))
+    {
+        if (RawUsername == "-----" || RawUsername.empty()) RawUsername = Internal::GetUsername();
+        if (RunescapeUsername == "-----" || RunescapeUsername.empty()) RunescapeUsername = Internal::GetLocalPlayer().GetNamePair().GetCleanName();
+    }
 
-    // zenytes, kills, deaths
+    const std::string AccountLabel = RawUsername + " [" + RunescapeUsername + "]";
+    const std::string BankValueLabel = "Bank value - 20M";
+    const std::string FocusLabel = "Focus - Hyper";
+    const std::string PassivityLabel = "Passivity - Mild";
+    const std::string AFKFrequencyLabel = "AFK Frequency - Very frequently";
+    const std::string WorldLabel = "World - " + std::to_string(Internal::GetCurrentWorld());
+    const std::string TimeSpentAFKLabel = "Spent " + MillisToHumanShort(100) + " AFK";
+    const std::string TimeSpentABreakingLabel = "Spent " +  MillisToHumanShort(BreakHandler::GetBreakTimer().GetTimeElapsed()) + " breaking";
+
+    AccountBox.Width = AccountLabel.size() * 8 + 6;
+    if (AccountBox.Width < 225) AccountBox.Width = 225;
+
+    Paint::DrawSquare(AccountBox, 77, 77, 77, 50);
+    Paint::DrawBox(AccountBox, 77, 77, 77, 255);
+
+    Paint::DrawString(AccountLabel, Point(AccountBox.X + 5, AccountBox.Y + 6), 0, 255, 255, 255);
+    Paint::DrawLine(Point(AccountBox.X, AccountBox.Y + 26), Point(AccountBox.GetX2(), AccountBox.Y + 26), 77, 77, 77, 125);
+    Paint::DrawString(BankValueLabel, Point(AccountBox.X + 5, AccountBox.Y + 30), 0, 255, 0, 255);
+    Paint::DrawLine(Point(AccountBox.X, AccountBox.Y + 50), Point(AccountBox.GetX2(), AccountBox.Y + 50), 77, 77, 77, 125);
+    Paint::DrawString(FocusLabel, Point(AccountBox.X +  5, AccountBox.Y + 54), 255, 255, 255, 255);
+    Paint::DrawString(PassivityLabel, Point(AccountBox.X +  5, AccountBox.Y + 74), 255, 255, 255, 255);
+    Paint::DrawString(AFKFrequencyLabel, Point(AccountBox.X +  5, AccountBox.Y + 94), 255, 255, 255, 255);
+    Paint::DrawLine(Point(AccountBox.X, AccountBox.Y + 114), Point(AccountBox.GetX2(), AccountBox.Y + 114), 77, 77, 77, 125);
+    Paint::DrawString(WorldLabel, Point(AccountBox.X +  5, AccountBox.Y + 118), 0, 255, 255, 255);
+    Paint::DrawLine(Point(AccountBox.X, AccountBox.Y + 138), Point(AccountBox.GetX2(), AccountBox.Y + 138), 77, 77, 77, 125);
+    Paint::DrawString(TimeSpentAFKLabel, Point(AccountBox.X +  5, AccountBox.Y + 142), 255, 255, 255, 255);
+    Paint::DrawString(TimeSpentABreakingLabel, Point(AccountBox.X +  5, AccountBox.Y + 162), 255, 255, 255, 255);
+
+
+    // Supllies - 22 trips left
+    // Restores - Manta rays - High alchs
+    // Divine ranging - Combat
+    // Royal seed pods - rings of dueling / poh tabs
+    // spacer
+    // Scales (BP) - Arclight charges left
+
 
     Gorillas::Draw();
-    Paint::DrawDot(GetMousePos(), 1.5f, 153, 51, 255, 255);
+    Paint::DrawDot(GetMousePos(), 2.5f, 0, 255, 255, 255);
 
     Paint::SwapBuffer();
 }

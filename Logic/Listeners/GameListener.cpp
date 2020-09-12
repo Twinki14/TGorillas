@@ -7,6 +7,7 @@
 #include <Game/Interfaces/Mainscreen.hpp>
 #include <Utilities/Mainscreen.hpp>
 #include <Game/Tools/Widgets.hpp>
+#include <Game/Interfaces/Minimap.hpp>
 
 GameListener& GameListener::Instance()
 {
@@ -657,6 +658,38 @@ void GameListener::ClearCurrentGorilla()
     }
 }
 
+void GameListener::CheckLocalPlayerNames()
+{
+    auto Username = Internal::GetUsername();
+    auto CleanName = Internal::GetLocalPlayer().GetNamePair().GetCleanName();
+
+    if (!GameListener::LocalPlayerUsername.empty())
+    {
+        if (Username != GameListener::LocalPlayerUsername && Mainscreen::IsLoggedIn())
+        {
+            std::lock_guard<std::mutex> Lock(MiscLock);
+            GameListener::LocalPlayerUsername = Username;
+        }
+    } else if (Mainscreen::IsLoggedIn())
+    {
+        std::lock_guard<std::mutex> Lock(MiscLock);
+        GameListener::LocalPlayerUsername = Username;
+    }
+
+    if (!GameListener::LocalPlayerName.empty())
+    {
+        if (CleanName != GameListener::LocalPlayerName && Mainscreen::IsLoggedIn())
+        {
+            std::lock_guard<std::mutex> Lock(MiscLock);
+            GameListener::LocalPlayerName = CleanName;
+        }
+    } else if (Mainscreen::IsLoggedIn())
+    {
+        std::lock_guard<std::mutex> Lock(MiscLock);
+        GameListener::LocalPlayerName = CleanName;
+    }
+}
+
 void GameListener::CheckPaintStatusBox()
 {
     auto StartB = Box(0, 0, 509, 25);
@@ -674,7 +707,26 @@ void GameListener::CheckPaintStatusBox()
         StartB.Y = B.Y - 35;
     }
     std::lock_guard<std::mutex> Lock(MiscLock);
-    PaintStatusBox = std::move(StartB);
+    PaintStatusBox = StartB;
+}
+
+void GameListener::CheckPaintSuppliesBox()
+{
+    auto StartB = Box(-1, -1, PaintSuppliesBox.Width, PaintSuppliesBox.Height);
+    const auto MinimapMiddle = Minimap::GetMiddle();
+    const auto Canvas = Internal::Client.GetCanvas();
+    const auto CanvasBounds = Box(0, 0, Canvas.GetWidth(), Canvas.GetHeight());
+    if (CanvasBounds.Height >= 748)
+    {
+        StartB.X = MinimapMiddle.X - (PaintSuppliesBox.Width / 2 + 32);
+        StartB.Y = MinimapMiddle.Y + MinimapMiddle.Y + 6;
+    } else
+    {
+        StartB.X = MinimapMiddle.X - (PaintSuppliesBox.Width + 145);
+        StartB.Y = MinimapMiddle.Y - 35;
+    }
+    std::lock_guard<std::mutex> Lock(MiscLock);
+    PaintSuppliesBox = StartB;
 }
 
 void GameListener::OnStart()
@@ -726,7 +778,10 @@ void GameListener::OnGameTick()
         if (Travel::InCavern())
             GameListener::CheckCurrentGorilla();
     }
+
+    GameListener::CheckLocalPlayerNames();
     GameListener::CheckPaintStatusBox();
+    GameListener::CheckPaintSuppliesBox();
 }
 
 void GameListener::OnNPCUpdate(std::vector<Internal::NPC>& NPCs, std::vector<std::int32_t>& NPCIndices)
@@ -1148,18 +1203,30 @@ std::int64_t GameListener::GetTimeSinceLastTick()
     return LastTickTime - CurrentTimeMillis();
 }
 
+std::string GameListener::GetLocalPlayerName()
+{
+    return LocalPlayerName;
+}
+
+std::string GameListener::GetLocalPlayerUsername()
+{
+    return LocalPlayerUsername;
+}
+
 Box GameListener::GetPaintStatusBox()
 {
     std::lock_guard<std::mutex> Lock(MiscLock);
     return PaintStatusBox;
 }
 
+Box GameListener::GetPaintSuppliesBox()
+{
+    std::lock_guard<std::mutex> Lock(MiscLock);
+    return PaintSuppliesBox;
+}
+
 GameListener::GameListener() : LoopTask("GameListener", std::chrono::milliseconds(20), GameListener::Loop)
 {
 
 }
-
-
-
-
 

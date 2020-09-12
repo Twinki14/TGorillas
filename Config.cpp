@@ -132,9 +132,9 @@ void Config::Set(const std::string& Key, const configuru::Config& Conf)
 
 void Config::SetGearsets()
 {
-    GearSet Melee;
-    GearSet Ranged;
-    GearSet Special;
+    GearSets::Set Melee;
+    GearSets::Set Ranged;
+    GearSets::Set Special;
 
     bool CfgHasMelee = Config::Cfg.count("GearSet_Melee_Names")
                        && Config::Cfg.count("GearSet_Melee_IDs")
@@ -148,35 +148,35 @@ void Config::SetGearsets()
 
     for (std::uint32_t I = Equipment::HEAD; I <= Equipment::AMMO; I++)
     {
-        if (CfgHasMelee) Melee.Items[I] = GearSet::Item(Config::Cfg["GearSet_Melee_Names"][I], Config::Cfg["GearSet_Melee_IDs"][I]);
-        if (CfgHasRanged) Ranged.Items[I] = GearSet::Item(Config::Cfg["GearSet_Ranged_Names"][I], Config::Cfg["GearSet_Ranged_IDs"][I]);
+        if (CfgHasMelee) Melee.Items[I] = GearSets::Item(Config::Cfg["GearSet_Melee_Names"][I].as_string(), Config::Cfg["GearSet_Melee_IDs"][I].as_integer<int>());
+        if (CfgHasRanged) Ranged.Items[I] = GearSets::Item(Config::Cfg["GearSet_Ranged_Names"][I].as_string(), Config::Cfg["GearSet_Ranged_IDs"][I].as_integer<int>());
     }
 
     if (Config::Cfg.count("SpecialWeapon"))
     {
-        if (Ranged.Items[Equipment::WEAPON].Name == "Magic shortbow (i)") Config::Cfg["SpecialWeapon"] = MAGIC_SHORTBOW;
-        if (Ranged.Items[Equipment::WEAPON].Name == "Toxic blowpipe") Config::Cfg["SpecialWeapon"] = TOXIC_BLOWPIPE;
+        if (Ranged.Items[Equipment::WEAPON].GetName() == "Magic shortbow (i)") Config::Cfg["SpecialWeapon"] = MAGIC_SHORTBOW;
+        if (Ranged.Items[Equipment::WEAPON].GetName() == "Toxic blowpipe") Config::Cfg["SpecialWeapon"] = TOXIC_BLOWPIPE;
 
         switch (Config::Cfg["SpecialWeapon"].as_integer<int32_t>())
         {
             case MAGIC_SHORTBOW:
             {
                 Special = Ranged;
-                Special.Items[Equipment::WEAPON] = GearSet::Item("Magic shortbow (i)", 12788);
+                Special.Items[Equipment::WEAPON] = GearSets::Item("Magic shortbow (i)", 12788);
                 break;
             }
 
             case TOXIC_BLOWPIPE:
             {
                 Special = Ranged;
-                Special.Items[Equipment::WEAPON] = GearSet::Item("Toxic blowpipe", 12926);
+                Special.Items[Equipment::WEAPON] = GearSets::Item("Toxic blowpipe", 12926);
                 break;
             }
 
             case SARADOMIN_GODSWORD:
             {
                 Special = Melee;
-                Special.Items[Equipment::WEAPON] = GearSet::Item("Saradomin godsword", 11806);
+                Special.Items[Equipment::WEAPON] = GearSets::Item("Saradomin godsword", 11806);
                 break;
             }
             default: break;
@@ -217,12 +217,11 @@ void Config::SetAntiban()
     Profile::Set(Profile::Var_UseHotkeys_Gametabs_Chance, 0.96);
 }
 
-
 void Config::CacheOSRSBoxItems()
 {
-    if (GearSets::Sets.count("Melee")) OSRSBox::Items::GetGearset(GearSets::Sets["Melee"]);
+/*    if (GearSets::Sets.count("Melee")) OSRSBox::Items::GetGearset(GearSets::Sets["Melee"]);
     if (GearSets::Sets.count("Ranged")) OSRSBox::Items::GetGearset(GearSets::Sets["Ranged"]);
-    if (GearSets::Sets.count("Special")) OSRSBox::Items::GetGearset(GearSets::Sets["Special"]);
+    if (GearSets::Sets.count("Special")) OSRSBox::Items::GetGearset(GearSets::Sets["Special"]);*/
 }
 
 bool Config::AuthenticateScript()

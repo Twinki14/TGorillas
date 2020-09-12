@@ -26,6 +26,8 @@ set(SOURCE_FILES
         Config.hpp
         GUI/GUI.cpp
         GUI/GUI.hpp
+        Logic/Banking.cpp
+        Logic/Banking.hpp
         Logic/Gorillas.cpp
         Logic/Gorillas.hpp
         Logic/Listeners/GameListener.cpp
@@ -34,6 +36,8 @@ set(SOURCE_FILES
         Logic/Listeners/LoopTask.hpp
         Logic/Supplies.cpp
         Logic/Supplies.hpp
+        Logic/Tracker.cpp
+        Logic/Tracker.hpp
         Logic/Travel.cpp
         Logic/Travel.hpp
         Logic/Types/Gorilla.cpp
@@ -137,7 +141,7 @@ set(SOURCE_FILES
         Libs/imgui/imgui_widgets.cpp
         Libs/imgui/imstb_rectpack.h
         Libs/imgui/imstb_textedit.h
-        Libs/imgui/imstb_truetype.h Logic/Tracker.cpp Logic/Tracker.hpp)
+        Libs/imgui/imstb_truetype.h)
 
 # Set directories
 set(ALPACABOT_DIRECTORY $ENV{HOMEDRIVE}$ENV{HOMEPATH}\\AlpacaBot)
@@ -168,6 +172,7 @@ include_directories(${TLIB_DIRECTORY}\\Include)
 include_directories(${TLIB_DIRECTORY}\\Include\\Tools)
 include_directories(${TLIB_DIRECTORY}\\Include\\Utilities)
 include_directories(${ALPACABOT_DIRECTORY}\\Include)
+target_link_directories(${PROJECT_NAME} PRIVATE Libs)
 target_link_directories(${PROJECT_NAME} PRIVATE Libs/SDL2/lib)
 target_link_directories(${PROJECT_NAME} PRIVATE ${TLIB_DIRECTORY}/cmake-build-release)
 target_link_directories(${PROJECT_NAME} PRIVATE ${ALPACABOT_DIRECTORY}/Library)

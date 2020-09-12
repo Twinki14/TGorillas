@@ -162,28 +162,32 @@ void Supplies::SetWhitelist()
     Supplies::SUPPLY_ITEMS_WHITELIST_ITEM_IDS.clear();
 
     for (auto& D : Globals::GetDegradableArray(Globals::ITEM_PRAYER_POTION, 1, 4))
-        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(std::move(D));
+        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(std::move(D));
 
     for (auto& D : Globals::GetDegradableArray(Globals::ITEM_SUPER_RESTORE, 1, 4))
-        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(std::move(D));
+        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(std::move(D));
 
     for (auto& D : Globals::GetDegradableArray((UseDivinePots) ? Globals::ITEM_DIVINE_RANGING_POTION : Globals::ITEM_RANGING_POTION, 1, 4))
-        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(std::move(D));
+        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(std::move(D));
 
     for (auto& D : Globals::GetDegradableArray((UseDivinePots) ? Globals::ITEM_DIVINE_SUPER_COMBAT_POTION : Globals::ITEM_SUPER_COMBAT_POTION, 1, 4))
-        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(std::move(D));
+        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(std::move(D));
 
     if (GearSets::Sets.count("Melee"))
     {
         for (std::uint32_t I = Equipment::HEAD; I <= Equipment::AMMO; I++)
         {
-            if (GearSets::Sets["Melee"].Items[I].Name != "NULL")
+            if (GearSets::Sets["Melee"].Items[I])
             {
-                if (GearSets::Sets["Melee"].Items[I].Degradable && !GearSets::Sets["Melee"].Items[I].DegradableNames.empty())
-                    for (const auto& D : GearSets::Sets["Melee"].Items[I].DegradableNames)
-                        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(D);
-                else
-                    Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(GearSets::Sets["Melee"].Items[I].Name);
+                Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(GearSets::Sets["Melee"].Items[I].GetName());
+
+                if (GearSets::Sets["Melee"].Items[I].IsDegradable())
+                    for (const auto& Degradable : GearSets::Sets["Melee"].Items[I].GetDegradableItems())
+                        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(Degradable.Name);
+
+                if (GearSets::Sets["Melee"].Items[I].IsChargeable())
+                    for (const auto& UnCharged : GearSets::Sets["Melee"].Items[I].GetUnchargedItems())
+                        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(UnCharged.Name);
             }
 
         }
@@ -193,26 +197,30 @@ void Supplies::SetWhitelist()
     {
         for (std::uint32_t I = Equipment::HEAD; I <= Equipment::AMMO; I++)
         {
-            if (GearSets::Sets["Ranged"].Items[I].Name != "NULL")
+            if (GearSets::Sets["Ranged"].Items[I])
             {
-                if (GearSets::Sets["Ranged"].Items[I].Degradable && !GearSets::Sets["Ranged"].Items[I].DegradableNames.empty())
-                    for (const auto& D : GearSets::Sets["Ranged"].Items[I].DegradableNames)
-                        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(D);
-                else
-                    Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(GearSets::Sets["Ranged"].Items[I].Name);
+                Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(GearSets::Sets["Ranged"].Items[I].GetName());
+
+                if (GearSets::Sets["Ranged"].Items[I].IsDegradable())
+                    for (const auto& Degradable : GearSets::Sets["Ranged"].Items[I].GetDegradableItems())
+                        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(Degradable.Name);
+
+                if (GearSets::Sets["Ranged"].Items[I].IsChargeable())
+                    for (const auto& UnCharged : GearSets::Sets["Ranged"].Items[I].GetUnchargedItems())
+                        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(UnCharged.Name);
             }
         }
     }
 
-    if (GearSets::Sets.count("Special") && GearSets::Sets["Special"].Items[Equipment::WEAPON].Name != "NULL")
-        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(GearSets::Sets["Special"].Items[Equipment::WEAPON].Name);
+    if (GearSets::Sets.count("Special") && GearSets::Sets["Special"].Items[Equipment::WEAPON].GetName() != "NULL")
+        Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(GearSets::Sets["Special"].Items[Equipment::WEAPON].GetName());
 
     switch (StatRefreshMethod)
     {
         case Config::CLAN_WARS:
         {
             for (auto& D : Globals::GetDegradableArray(Globals::ITEM_RING_OF_DUELING, 1, 8))
-                Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(std::move(D));
+                Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(std::move(D));
         } break;
 
         case Config::POH:
@@ -222,11 +230,11 @@ void Supplies::SetWhitelist()
         default: break;
     }
 
-    if (UseRunePouch) Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(Globals::ITEM_RUNE_POUCH);
+    if (UseRunePouch) Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(Globals::ITEM_RUNE_POUCH);
 
-    Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(Food::GetName(FoodCfg));
-    Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(Food::GetName(Food::SHARK));
-    Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace_back(Globals::ITEM_ROYAL_SEED_POD);
+    Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(Food::GetName(FoodCfg));
+    Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(Food::GetName(Food::SHARK));
+    Supplies::SUPPLY_ITEMS_WHITELIST_NAMES.emplace(Globals::ITEM_ROYAL_SEED_POD);
 }
 
 Supplies::SUPPLY_STATE Supplies::GetInventoryState(const Supplies::SUPPLY_ITEM& Item)
@@ -264,7 +272,7 @@ Supplies::SUPPLY_STATE Supplies::GetInventoryState(const Supplies::SUPPLY_ITEM& 
             static const auto UseHighAlchemy = Config::Get("UseHighAlchemy").as_bool();
 
             if (UseRunePouch) return Snapshot.HasRunePouch_Inv && Snapshot.HasCorrectRunePouchRunes ? READY_OR_FULL : NOT_READY;
-            if (UseHighAlchemy) return Snapshot.HighAlchemyCasts_Inv > 100 ? READY_OR_FULL : NOT_READY;
+            if (UseHighAlchemy) return Snapshot.HighAlchemyCasts_Inv >= 50 ? READY_OR_FULL : NOT_READY;
             return READY_OR_ADEQUATE;
         }
 

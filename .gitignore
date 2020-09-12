@@ -2,3 +2,5 @@
 cmake-build-debug/
 cmake-build-release/
 .idea/workspace.xml
+.idea/.gitignore
+.idea/vcs.xml

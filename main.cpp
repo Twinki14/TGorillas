@@ -1,5 +1,6 @@
 #include <Game/Core.hpp>
 #include <TScript.hpp>
+#include <Tools/OSRSBox/OSRSBox.hpp>
 #include <Tools/OSRSBox/Items.hpp>
 #include <Utilities/BackgroundTask/CameraTask.hpp>
 #include <Utilities/BackgroundTask/AuthenticateTask.hpp>
@@ -16,6 +17,18 @@
 #include "Logic/Supplies.hpp"
 
 // move all loot items to coins tab
+
+/*
+ * Abyssal whip - Prefers arclight if there's charges available, will switch to whip as backup
+ * Blowpipe - With plenty of scales/darts, the script should recharge
+ * Prayer/Super restores - The script should tell you what the "player" will prefer, the setting is unique to the player name, but can be overriden
+ * Manta rays - Primary food
+ * Anglerfish - Should only use one or two per inventory/trip, it's only used for 'filler' slots for equipment swaps
+ * Divine ranging/super combat potions - one of each per trip
+ * Ring of dueling / POH tabs - These are used to restore stats at the end of a trip, if the player has a good POH, it'll use teleport tabs, otherwise RoDs for the pvp portal
+ * Royal seed pods - Used for deathtrips, have like 5-10 in the bank
+ * Rune pouch / High alchemy runes - Lava runes and nature runes for high alchemy, will only high alch if the account has a rune pouch available, can no longer just buy rune pouches
+ */
 
 void Setup()
 {
@@ -120,15 +133,15 @@ void PaintMethod()
     Paint::DrawString(DiedStr, Point(StatsBox.X + 5, StatsBox.Y + 50), DeathColor.Red, DeathColor.Green, DeathColor.Blue, DeathColor.Alpha);
 
     auto AccountBox = Box(StatusBox.X, StatusBox.Y - 195, 225, 184);
-    static auto RawUsername = LoggedIn ? Internal::GetUsername() : "-----";
+/*    static auto RawUsername = LoggedIn ? Internal::GetUsername() : "-----";
     static auto RunescapeUsername = LoggedIn ? Internal::GetLocalPlayer().GetNamePair().GetCleanName() : "-----";
     if (LoggedIn && (RawUsername == "-----" || RunescapeUsername == "-----" || RawUsername.empty() || RunescapeUsername.empty()))
     {
         if (RawUsername == "-----" || RawUsername.empty()) RawUsername = Internal::GetUsername();
         if (RunescapeUsername == "-----" || RunescapeUsername.empty()) RunescapeUsername = Internal::GetLocalPlayer().GetNamePair().GetCleanName();
-    }
+    }*/
 
-    const std::string AccountLabel = RawUsername + " [" + RunescapeUsername + "]";
+    const std::string AccountLabel = GameListener::GetLocalPlayerUsername() + " [" + GameListener::GetLocalPlayerName() + "]";
     const std::string BankValueLabel = "Bank value - 20M";
     const std::string FocusLabel = "Focus - Hyper";
     const std::string PassivityLabel = "Passivity - Mild";
@@ -156,14 +169,71 @@ void PaintMethod()
     Paint::DrawString(TimeSpentAFKLabel, Point(AccountBox.X +  5, AccountBox.Y + 142), 255, 255, 255, 255);
     Paint::DrawString(TimeSpentABreakingLabel, Point(AccountBox.X +  5, AccountBox.Y + 162), 255, 255, 255, 255);
 
+    auto SuppliesBox = GameListener::GetPaintSuppliesBox();
+    if (SuppliesBox.X < 0 || SuppliesBox.Y < 0 || !LoggedIn)
+    {
+        if (!LoggedIn)
+        {
+            SuppliesBox.X = LeftStartX + 544;
+            SuppliesBox.Y = 200;
+        } else
+        {
+            const auto MinimapMiddle = Minimap::GetMiddle();
+            const auto Canvas = Internal::Client.GetCanvas();
+            const auto CanvasBounds = Box(0, 0, Canvas.GetWidth(), Canvas.GetHeight());
+            if (CanvasBounds.Height >= 748)
+            {
+                SuppliesBox.X = MinimapMiddle.X - (SuppliesBox.Width / 2 + 32);
+                SuppliesBox.Y = MinimapMiddle.Y + MinimapMiddle.Y + 6;
+            } else
+            {
+                SuppliesBox.X = MinimapMiddle.X - (SuppliesBox.Width + 145);
+                SuppliesBox.Y = MinimapMiddle.Y - 35;
+            }
+        }
+    }
 
-    // Supllies - 22 trips left
-    // Restores - Manta rays - High alchs
-    // Divine ranging - Combat
-    // Royal seed pods - rings of dueling / poh tabs
-    // spacer
-    // Scales (BP) - Arclight charges left
+    std::int32_t SupplyTripsLeft = 0;
+    std::int32_t RestoresLeft = 0;
+    std::int32_t FoodLeft = 0;
+    std::int32_t RangingLeft = 0;
+    std::int32_t CombatLeft = 0;
+    std::int32_t HighAlchemyCastsLeft = 0;
+    std::int32_t RoDTeleportsLeft = 0;
+    std::int32_t RoyalSeedPodsLeft = 0;
+    std::int32_t ScalesLeft = 0;
+    std::int32_t DartsLeft = 0;
+    std::int32_t ArclightChargesLeft = 0;
+    const std::string SuppliesLabel = "Supplies - " + std::to_string(SupplyTripsLeft) + " est. trips left";
+    const std::string RestoresLabel = "Restores - " + std::to_string(RestoresLeft);
+    const std::string FoodsLabel = "Manta rays - " + std::to_string(FoodLeft);
+    const std::string RangingLabel = "Ranging [4] - " + std::to_string(RangingLeft);
+    const std::string CombatsLabel = "Sup. Combat [4] - " + std::to_string(CombatLeft);
+    const std::string HighAlchsLabel = "High Alchemy casts - " + std::to_string(HighAlchemyCastsLeft);
+    const std::string RoDLabel = "RoD [Total teleports] - " + std::to_string(RoDTeleportsLeft);
+    const std::string RoyalSeedPodsLabel = "Royal seed pods - " + std::to_string(RoyalSeedPodsLeft);
+    const std::string BlowPipeScalesLabel = "Scales - " + std::to_string(ScalesLeft) + " Darts - " + std::to_string(DartsLeft);
+    const std::string ArclightCharges = "Arclight charges - " + std::to_string(ArclightChargesLeft);
+    const std::string BarrowsLabel = "Barrows - 4/4";
 
+    Paint::DrawSquare(SuppliesBox, 77, 77, 77, 50);
+    Paint::DrawBox(SuppliesBox, 77, 77, 77, 255);
+
+    Point Next = Point( ((SuppliesBox.GetMiddle().X) - (SuppliesLabel.size() * 3)), SuppliesBox.Y + 6);
+    Paint::DrawString(SuppliesLabel, Next, BaseTextColor.Red, BaseTextColor.Green, BaseTextColor.Blue, BaseTextColor.Alpha); Next = Point(SuppliesBox.X, SuppliesBox.Y + 26);
+    Paint::DrawLine(Next, Point(SuppliesBox.GetX2(), SuppliesBox.Y + 26), 77, 77, 77, 125); Next = Point(SuppliesBox.X + 5, SuppliesBox.Y + 30);
+    Paint::DrawString(RestoresLabel, Next, 255, 255, 255, 255); Next.Y += 20;
+    Paint::DrawString(FoodsLabel, Next, 255, 255, 255, 255); Next.Y += 20;
+    Paint::DrawString(RangingLabel, Next, 255, 255, 255, 255); Next.Y += 20;
+    Paint::DrawString(CombatsLabel, Next, 255, 255, 255, 255); Next.Y += 20;
+    Paint::DrawString(HighAlchsLabel, Next, 255, 255, 255, 255); Next = Point(SuppliesBox.X, Next.Y + 20);
+    Paint::DrawLine(Next, Point(SuppliesBox.GetX2(), Next.Y), 77, 77, 77, 125); Next = Point(SuppliesBox.X + 5, Next.Y + 4);
+    Paint::DrawString(RoDLabel, Next, 255, 255, 255, 255); Next.Y += 20;
+    Paint::DrawString(RoyalSeedPodsLabel, Next, 255, 255, 255, 255); Next = Point(SuppliesBox.X, Next.Y + 20);
+    Paint::DrawLine(Next, Point(SuppliesBox.GetX2(), Next.Y), 77, 77, 77, 125); Next = Point(SuppliesBox.X + 5, Next.Y + 4);
+    Paint::DrawString(BlowPipeScalesLabel, Next, 255, 255, 255, 255); Next.Y += 20;
+    Paint::DrawString(ArclightCharges, Next, 255, 255, 255, 255); Next.Y += 20;
+    Paint::DrawString(BarrowsLabel, Next, 255, 255, 255, 255); Next.Y += 20;
 
     Gorillas::Draw();
     Paint::DrawDot(GetMousePos(), 2.5f, 0, 255, 255, 255);
@@ -208,6 +278,7 @@ bool OnStart()
         Config::CacheOSRSBoxItems();
         Supplies::SetWhitelist();
         Script::Start(PaintMethod, true);
+        GameListener::Instance().Start();
         return true;
     }
     Script::Shutdown();
@@ -216,8 +287,29 @@ bool OnStart()
 
 bool Loop()
 {
-    //GameListener::Instance().Start();
-    return true;
+    auto I = GearSets::Item("Verac's plateskirt 0");
+    return false;
+
+   /* for (std::uint32_t I = Equipment::HEAD; I <= Equipment::AMMO; I++)
+    {
+        if (GearSets::Sets["Melee"].Items[I].Name != "NULL" && GearSets::Sets["Ranged"].Items[I].Name != "NULL")
+        {
+            if (GearSets::Sets["Melee"].Items[I].Name != GearSets::Sets["Ranged"].Items[I].Name)
+            {
+                //MeleeGearIDs.emplace_back(GearSets::Sets["Melee"].Items[I].ID);
+                //RangedGearIDs.emplace_back(GearSets::Sets["Ranged"].Items[I].ID);
+
+                if (GearSets::Sets["Ranged"].Items[I].Name.find("Toxic blowpipe") != std::string::npos) // 2h
+                {
+                    DebugLog("Melee > {}, {}", GearSets::Sets["Melee"].Items[Equipment::SHIELD].Name, GearSets::Sets["Melee"].Items[Equipment::SHIELD].ID);
+                }
+
+                DebugLog("Melee > {}, {}", GearSets::Sets["Melee"].Items[I].Name, GearSets::Sets["Melee"].Items[I].ID);
+                DebugLog("Ranged > {}, {}", GearSets::Sets["Ranged"].Items[I].Name, GearSets::Sets["Ranged"].Items[I].ID);
+            }
+        }
+    }*/
+    return false;
     if (Mainscreen::IsLoggedIn())
     {
         if (BreakHandler::Break())

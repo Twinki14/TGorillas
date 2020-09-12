@@ -106,12 +106,12 @@ std::int32_t Gorillas::GetEquippedWeaponStyle()
     if (GearSets::Sets.count("Melee") && GearSets::Sets.count("Ranged"))
     {
         auto WeaponItem = Equipment::GetItem(Equipment::WEAPON);
-        if (WeaponItem.GetName() == GearSets::Sets["Melee"].Items[Equipment::WEAPON].Name) return MELEE_FLAG;
-        if (WeaponItem.GetName() == GearSets::Sets["Ranged"].Items[Equipment::WEAPON].Name) return RANGED_FLAG;
+        if (WeaponItem.GetName() == GearSets::Sets["Melee"].Items[Equipment::WEAPON].GetName()) return MELEE_FLAG;
+        if (WeaponItem.GetName() == GearSets::Sets["Ranged"].Items[Equipment::WEAPON].GetName()) return RANGED_FLAG;
 
         if (GearSets::Sets.count("Special") && WeaponItem)
         {
-            if (WeaponItem.GetName() == GearSets::Sets["Special"].Items[Equipment::WEAPON].Name)
+            if (WeaponItem.GetName() == GearSets::Sets["Special"].Items[Equipment::WEAPON].GetName())
             {
                 switch (Config::Get("SpecialWeapon").as_integer<int>())
                 {
@@ -465,6 +465,9 @@ Tile Gorillas::GetBoulderMoveTile(const std::shared_ptr<Gorilla>& Gorilla)
         }
     } else // RANGED
     {
+        // only move further away if playersn't isn't already two-3 tiles away
+        // remove tiles outside of range from gorilla
+
         bool SomeInMelee = std::any_of(ValidMovements.begin(), ValidMovements.end(), [&](const WorldArea& W) -> bool
         {
             return W.IntersectsWith(GorillaArea) || W.IsInMeleeDistance(GorillaArea);

@@ -92,8 +92,8 @@ namespace Supplies
 
     namespace
     {
-        inline std::vector<std::string> SUPPLY_ITEMS_WHITELIST_NAMES;
-        inline std::vector<std::int32_t> SUPPLY_ITEMS_WHITELIST_ITEM_IDS;
+        inline std::set<std::string> SUPPLY_ITEMS_WHITELIST_NAMES;
+        inline std::set<std::int32_t> SUPPLY_ITEMS_WHITELIST_ITEM_IDS;
 
         bool InWhitelist(const std::string_view& Name)
         {

@@ -3,40 +3,27 @@
 
 #include <utility>
 #include <set>
-
-
+#include <Core/Types/Tile.hpp>
+#include <Utilities/Containers.hpp>
 #include "Supplies.hpp"
+
+namespace Globals
+{
+    // NPCs
+    const std::vector<std::string> NPCS_BANKER = { "Banker" };
+
+    // Gameobjects
+    const std::vector<std::string> GAMEOBJECTS_BANKS = { "Bank booth", "Bank chest", "Chest" };
+
+    // WallObjects
+    const std::vector<std::string> WALLOBJECTS_BANKS = { "Grand Exchange booth" };
+}
+
 
 namespace Banking
 {
-    namespace
-    {
-        class SlotSet
-        {
-        public:
-            SlotSet() = default;
-            explicit SlotSet(std::set<uint32_t> Slots) : Slots(std::move(Slots)) { }
-
-            [[nodiscard]] std::vector<int32_t> GetSlotIDs(const std::vector<int32_t>& InventoryIDs) const
-            {
-                std::vector<int32_t> Result;
-                if (InventoryIDs.empty()) return Result;
-
-                for (const auto& Index : Slots)
-                    Result.emplace_back(InventoryIDs[Index]);
-
-                return Result;
-            }
-
-            [[nodiscard]] const std::set<uint32_t>& GetSlots() const { return Slots; }
-            ~SlotSet() = default;
-        private:
-            std::set<uint32_t> Slots;
-        };
-
-        bool ClearInventory(std::int32_t Amount);
-    }
-    bool Withdraw(const Supplies::SUPPLY_ITEMS_SNAPSHOT& Snapshot);
+    bool Open(const Tile& Override = Tile());
+    bool Withdraw(Supplies::Snapshot& Snapshot);
 };
 
 #endif // BANKING_HPP_INCLUDED

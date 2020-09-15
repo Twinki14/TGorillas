@@ -690,6 +690,23 @@ void GameListener::CheckLocalPlayerNames()
     }
 }
 
+void GameListener::CheckInventoryContainer()
+{
+    if (Mainscreen::IsLoggedIn())
+    {
+        auto Inventory = Containers::Container(Containers::INVENTORY);
+        if (Inventory != GameListener::InventoryContainer)
+        {
+            std::lock_guard<std::mutex> Lock(MiscLock);
+            GameListener::InventoryContainer = std::move(Inventory);
+        }
+    } else if (GameListener::InventoryContainer)
+    {
+        std::lock_guard<std::mutex> Lock(MiscLock);
+        GameListener::InventoryContainer = std::move(Containers::Container());
+    }
+}
+
 void GameListener::CheckPaintStatusBox()
 {
     auto StartB = Box(0, 0, 509, 25);
@@ -780,6 +797,7 @@ void GameListener::OnGameTick()
     }
 
     GameListener::CheckLocalPlayerNames();
+    GameListener::CheckInventoryContainer();
     GameListener::CheckPaintStatusBox();
     GameListener::CheckPaintSuppliesBox();
 }
@@ -1225,8 +1243,16 @@ Box GameListener::GetPaintSuppliesBox()
     return PaintSuppliesBox;
 }
 
+Containers::Container GameListener::GetInventoryContainer()
+{
+    std::lock_guard<std::mutex> Lock(MiscLock);
+    return GameListener::InventoryContainer;
+}
+
 GameListener::GameListener() : LoopTask("GameListener", std::chrono::milliseconds(20), GameListener::Loop)
 {
 
 }
+
+
 

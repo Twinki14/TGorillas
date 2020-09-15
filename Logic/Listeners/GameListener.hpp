@@ -5,6 +5,7 @@
 #include <shared_mutex>
 #include <map>
 #include <Game/Interactable/Projectile.hpp>
+#include <Utilities/Containers.hpp>
 #include "LoopTask.hpp"
 #include "../Types/Gorilla.hpp"
 #include "../Types/TrackedPlayer.hpp"
@@ -40,6 +41,7 @@ public:
     static std::int64_t GetTimeSinceLastTick();
     static std::string GetLocalPlayerName();
     static std::string GetLocalPlayerUsername();
+    static Containers::Container GetInventoryContainer();
     static Box GetPaintStatusBox();
     static Box GetPaintSuppliesBox();
 
@@ -66,6 +68,7 @@ private:
     static void ClearCurrentGorilla();
 
     static void CheckLocalPlayerNames();
+    static void CheckInventoryContainer();
     static void CheckPaintStatusBox();
     static void CheckPaintSuppliesBox();
 
@@ -86,6 +89,7 @@ private:
     inline static std::mutex MiscLock;
     inline static std::string LocalPlayerName;
     inline static std::string LocalPlayerUsername;
+    inline static Containers::Container InventoryContainer;
     inline static Box PaintStatusBox = Box(-1, -1, 509, 25);
     inline static Box PaintSuppliesBox = Box(-1, -1, 211, 236);
 

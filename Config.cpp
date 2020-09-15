@@ -183,9 +183,9 @@ void Config::SetGearsets()
         }
     }
 
-    GearSets::Sets["Melee"] = std::move(Melee);
-    GearSets::Sets["Ranged"] = std::move(Ranged);
-    GearSets::Sets["Special"] = std::move(Special);
+    GearSets::Sets.insert_or_assign("Melee", std::move(Melee));
+    GearSets::Sets.insert_or_assign("Ranged", std::move(Ranged));
+    GearSets::Sets.insert_or_assign("Special", std::move(Special));
 }
 
 void Config::SetAntiban()
@@ -215,13 +215,6 @@ void Config::SetAntiban()
     Profile::Set(Profile::Var_UseHotkeys_Gametabs, Config::Get("UseHotkeys_Gametabs").as_bool());
     Profile::Set(Profile::Var_UseHotkeys_EscCloseInterface_Chance, 0.95);
     Profile::Set(Profile::Var_UseHotkeys_Gametabs_Chance, 0.96);
-}
-
-void Config::CacheOSRSBoxItems()
-{
-/*    if (GearSets::Sets.count("Melee")) OSRSBox::Items::GetGearset(GearSets::Sets["Melee"]);
-    if (GearSets::Sets.count("Ranged")) OSRSBox::Items::GetGearset(GearSets::Sets["Ranged"]);
-    if (GearSets::Sets.count("Special")) OSRSBox::Items::GetGearset(GearSets::Sets["Special"]);*/
 }
 
 bool Config::AuthenticateScript()

@@ -2,6 +2,9 @@
 #define SUPPLIES_HPP_INCLUDED
 
 #include <cstdint>
+#include <Utilities/Inventory.hpp>
+#include <Utilities/Containers.hpp>
+#include <Tools/OSRSBox/Items.hpp>
 #include <Game/Interactable/Item.hpp>
 
 namespace Globals
@@ -32,20 +35,27 @@ namespace Globals
 
 namespace Supplies
 {
-    typedef struct SUPPLY_POTIONS_INFO
+    enum InventoryLayout
+    {
+        LAYOUT_1, // https://i.imgur.com/mYCVPH7.png
+        LAYOUT_2, // https://i.imgur.com/AnXrwyn.png
+        LAYOUT_3 // https://i.imgur.com/cWfbpJL.png
+    };
+
+    typedef struct Potion
     {
         std::int32_t Total; // -1 if unlimited
         std::uint32_t Dose_1;
         std::uint32_t Dose_2;
         std::uint32_t Dose_3;
         std::uint32_t Dose_4;
-    } SUPPLY_POTIONS_INFO;
+    } Potion;
 
-    typedef struct NON_SUPPLY_ITEM
+    typedef struct ItemRecord
     {
-        Interactable::Item Item;
         std::int32_t ID;
         std::string Name;
+        Interactable::Item Item;
         std::int32_t StackAmount;
         std::uint32_t ExchangeValue;
         std::uint32_t TotalExchangeValue;
@@ -53,10 +63,15 @@ namespace Supplies
         std::uint32_t HighAlchValue;
         std::int32_t HighAlchProfit;
         bool ShouldAlch;
-    } NON_SUPPLY_ITEM;
 
-    typedef struct SUPPLY_ITEMS_SNAPSHOT
+        OSRSBox::Items::Item Info;
+    } ItemRecord;
+
+    typedef struct Snapshot
     {
+        Containers::Container BankContainer;
+        Containers::Container InventoryContainer;
+
         bool MeleeSet_Holding = false;
         bool MeleeSet_Equipped = false;
         bool RangedSet_Holding = false;
@@ -67,28 +82,48 @@ namespace Supplies
         bool HasRunePouch_Inv = false;
         bool HasRoyalSeedPod_Inv = false;
 
-        SUPPLY_POTIONS_INFO Potions_Inv_Restore;
-        SUPPLY_POTIONS_INFO Potions_Inv_Prayer;
-        SUPPLY_POTIONS_INFO Potions_Inv_PrayerRestore;
-        SUPPLY_POTIONS_INFO Potions_Inv_Ranging;
-        SUPPLY_POTIONS_INFO Potions_Inv_SuperCombat;
+        Potion Potions_Inv_Restore;
+        Potion Potions_Inv_Prayer;
+        Potion Potions_Inv_PrayerRestore;
+        Potion Potions_Inv_Ranging;
+        Potion Potions_Inv_SuperCombat;
         std::int32_t Food_Inv;
         std::int32_t Sharks_Inv;
         std::int32_t HighAlchemyCasts_Inv;
         std::int32_t EmptySlots_Inv;
-        std::vector<NON_SUPPLY_ITEM> NonSupplyItems_Inv;
+        std::vector<ItemRecord> NonWhitelistedItems_Inv;
 
         bool HasRunePouch_Bank = false;
         bool HasRoyalSeedPod_Bank = false;
 
-        SUPPLY_POTIONS_INFO Potions_Bank_PrayerRestore;
-        SUPPLY_POTIONS_INFO Potions_Bank_Ranging;
-        SUPPLY_POTIONS_INFO Potions_Bank_SuperCombat;
+        Potion Potions_Bank_PrayerRestore;
+        Potion Potions_Bank_Ranging;
+        Potion Potions_Bank_SuperCombat;
         std::int32_t Food_Bank;
 
         bool HasCorrectRunePouchRunes = false;
-    } SUPPLY_ITEMS_SNAPSHOT;
-    SUPPLY_ITEMS_SNAPSHOT GetSnapshot(bool InventoryOnly = false);
+    } Snapshot;
+
+    // TELEPORTS for missing teleport items, like frem boots, max/construction capes, law runes
+    // RUNE_POUCH will set the pouch up to what's needed, and withdraw any needed runes like nature runes
+    typedef enum Group
+    {
+        GEAR,
+        PRAYER_RESTORE,
+        RANGING_POTION,
+        SUPER_COMBAT,
+        TELEPORTS, // takes care of any teleport items, and determines if we have enough teleports
+        RUNES, // Takes care of rune setup in the pouch, and any runes needed for high alch
+        FOOD
+    } Group;
+
+    typedef enum GroupState
+    {
+        UNUSED = -1, // the supply_item isn't used, ignored in supply handles
+        NOT_READY, // not enough of the item to finish a full trip
+        READY_OR_ADEQUATE, // enough for a full trip, but it's not fully ready
+        READY_OR_FULL, // ready/full on supplies
+    } GroupState;
 
     namespace
     {
@@ -107,42 +142,25 @@ namespace Supplies
                    != SUPPLY_ITEMS_WHITELIST_ITEM_IDS.end();
         }
     }
-    void SetWhitelist();
 
-    // TELEPORTS for missing teleport items, like frem boots, max/construction capes, law runes
-    // RUNE_POUCH will set the pouch up to what's needed, and withdraw any needed runes like nature runes
-    typedef enum SUPPLY_ITEM
-    {
-        GEAR,
-        PRAYER_RESTORE,
-        RANGING_POTION,
-        SUPER_COMBAT,
-        TELEPORTS, // takes care of any teleport items, and determines if we have enough teleports
-        RUNES, // Takes care of rune setup in the pouch, and any runes needed for high alch
-        FOOD
-    } SUPPLY_ITEM;
+    std::uint32_t GetInventoryLayout();
+    Snapshot GetSnapshot(bool InventoryOnly = false);
 
-    typedef enum SUPPLY_STATE
-    {
-        UNUSED = -1, // the supply_item isn't used, ignored in supply handles
-        NOT_READY, // not enough of the item to finish a full trip
-        READY_OR_ADEQUATE, // enough for a full trip, but it's not fully ready
-        READY_OR_FULL, // ready/full on supplies
-        //EXCESSIVE // too much of the item - moved to NOT_READY
-    } SUPPLY_STATE;
+    GroupState GetState(const Group& G);
+    GroupState GetState(const Group& G, const Supplies::Snapshot& Snapshot);
 
-    static SUPPLY_STATE GetInventoryState(const SUPPLY_ITEM& Item);
-    static SUPPLY_STATE GetInventoryState(const SUPPLY_ITEM& Item, const Supplies::SUPPLY_ITEMS_SNAPSHOT& Snapshot);
+    // TODO - Maybe remove changed and handle it automatically - with containers I can just wait until it changes, checking every tick via GameListener
+    bool Withdraw(const Group& G, bool& Changed, Supplies::Snapshot& Snapshot); // Take out only whats needed
+    bool Deposit(const Group& G, bool& Changed, Supplies::Snapshot& Snapshot); // Deposit excess + used
+    bool Supply(const Group& G, bool& Changed, Supplies::Snapshot& Snapshot);
 
-    static bool Withdraw(const SUPPLY_ITEM& Item, bool& Changed, Supplies::SUPPLY_ITEMS_SNAPSHOT& Snapshot); // Take out only whats needed
-    static bool Deposit(const SUPPLY_ITEM& Item, bool& Changed, Supplies::SUPPLY_ITEMS_SNAPSHOT& Snapshot); // Deposit excess + used
-    static bool Supply(const SUPPLY_ITEM& Item, bool& Changed, Supplies::SUPPLY_ITEMS_SNAPSHOT& Snapshot);
+    bool SetupRunePouch(bool& Changed);
+    bool Recharge(Supplies::Snapshot& Snapshot);
+    bool OrganizeInventory(const Group& G, Supplies::Snapshot& Snapshot);
 
-    static bool SetupRunePouch(bool& Changed);
-
-    static std::uint32_t GetRemainingHP(bool CheckGround = false);
-    static std::uint32_t GetRemainingHP(bool CheckGround, const Supplies::SUPPLY_ITEMS_SNAPSHOT& Snapshot);
-    static std::uint64_t GetRemainingPotionTime(const SUPPLY_ITEM& Item, bool PotionOnly = false); // Only in inventory
-    static std::uint64_t GetRemainingPotionTime(const SUPPLY_ITEM& Item, const Supplies::SUPPLY_ITEMS_SNAPSHOT& Snapshot, bool PotionOnly = false);
+    std::uint32_t GetRemainingHP(bool CheckGround = false);
+    std::uint32_t GetRemainingHP(bool CheckGround, const Supplies::Snapshot& Snapshot);
+    std::uint64_t GetRemainingPotionTime(const Group& G, bool PotionOnly = false); // Only in inventory
+    std::uint64_t GetRemainingPotionTime(const Group& G, const Supplies::Snapshot& Snapshot, bool PotionOnly = false);
 }
 #endif // SUPPLIES_HPP_INCLUDED

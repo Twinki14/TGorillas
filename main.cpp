@@ -6,6 +6,7 @@
 #include <Utilities/BackgroundTask/AuthenticateTask.hpp>
 #include <Utilities/Mainscreen.hpp>
 #include <Utilities/GearSets.hpp>
+#include <Utilities/Containers.hpp>
 #include <bitset>
 #include <Tools/PaintBitmap.hpp>
 #include "Config.hpp"
@@ -15,6 +16,7 @@
 #include "Logic/Types/WorldArea.hpp"
 #include "Logic/Travel.hpp"
 #include "Logic/Supplies.hpp"
+#include "Logic/Banking.hpp"
 
 // move all loot items to coins tab
 
@@ -255,30 +257,17 @@ bool OnStart()
     }
 
     SetLoopDelay(0);
-    Script::Start(PaintMethod, true);
-    return true;
+    //Script::Start(PaintMethod, true);
+    //return true;
 
     //if (GUI::Init())
     {
-
-/*        GearSets::SetFromEquipped("Melee");
-        //GearSets::SetFromEquipped("Ranged");
-        for (std::uint32_t I = Equipment::HEAD; I <= Equipment::AMMO; I++)
-        {
-            Config::Cfg["GearSet_Melee_Names"][I] = GearSets::Sets["Melee"].Items[I].Name;
-            Config::Cfg["GearSet_Melee_IDs"][I] = GearSets::Sets["Melee"].Items[I].ID;
-
-            Config::Cfg["GearSet_Ranged_Names"][I] = GearSets::Sets["Ranged"].Items[I].Name;
-            Config::Cfg["GearSet_Ranged_IDs"][I] = GearSets::Sets["Ranged"].Items[I].ID;
-        }*/
-
         Config::SaveArgs("default.json");
         Config::SetGearsets();
         Config::SetAntiban();
-        Config::CacheOSRSBoxItems();
-        Supplies::SetWhitelist();
+        //Supplies::SetWhitelist(true);
         Script::Start(PaintMethod, true);
-        GameListener::Instance().Start();
+       GameListener::Instance().Start();
         return true;
     }
     Script::Shutdown();
@@ -287,29 +276,26 @@ bool OnStart()
 
 bool Loop()
 {
-    auto I = GearSets::Item("Verac's plateskirt 0");
-    return false;
+    bool c;
+    Supplies::Snapshot S = Supplies::GetSnapshot();
+    bool Result = Supplies::Withdraw(Supplies::GEAR, c, S);
+    DebugLog("{}", false);
 
-   /* for (std::uint32_t I = Equipment::HEAD; I <= Equipment::AMMO; I++)
+/*    GearSets::SetFromEquipped("Melee");
+    //GearSets::SetFromEquipped("Ranged");
+    for (std::uint32_t I = Equipment::HEAD; I <= Equipment::AMMO; I++)
     {
-        if (GearSets::Sets["Melee"].Items[I].Name != "NULL" && GearSets::Sets["Ranged"].Items[I].Name != "NULL")
-        {
-            if (GearSets::Sets["Melee"].Items[I].Name != GearSets::Sets["Ranged"].Items[I].Name)
-            {
-                //MeleeGearIDs.emplace_back(GearSets::Sets["Melee"].Items[I].ID);
-                //RangedGearIDs.emplace_back(GearSets::Sets["Ranged"].Items[I].ID);
+        Config::Cfg["GearSet_Melee_Names"][I] = GearSets::Sets["Melee"].Items[I].GetName();
+        Config::Cfg["GearSet_Melee_IDs"][I] = GearSets::Sets["Melee"].Items[I].GetID();
 
-                if (GearSets::Sets["Ranged"].Items[I].Name.find("Toxic blowpipe") != std::string::npos) // 2h
-                {
-                    DebugLog("Melee > {}, {}", GearSets::Sets["Melee"].Items[Equipment::SHIELD].Name, GearSets::Sets["Melee"].Items[Equipment::SHIELD].ID);
-                }
+        Config::Cfg["GearSet_Ranged_Names"][I] = GearSets::Sets["Ranged"].Items[I].GetName();
+        Config::Cfg["GearSet_Ranged_IDs"][I] = GearSets::Sets["Ranged"].Items[I].GetID();
+    }
 
-                DebugLog("Melee > {}, {}", GearSets::Sets["Melee"].Items[I].Name, GearSets::Sets["Melee"].Items[I].ID);
-                DebugLog("Ranged > {}, {}", GearSets::Sets["Ranged"].Items[I].Name, GearSets::Sets["Ranged"].Items[I].ID);
-            }
-        }
-    }*/
+    Config::SaveArgs("default.json");*/
+
     return false;
+
     if (Mainscreen::IsLoggedIn())
     {
         if (BreakHandler::Break())

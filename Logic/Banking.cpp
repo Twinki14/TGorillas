@@ -1,16 +1,15 @@
 #include "Banking.hpp"
 #include "Listeners/GameListener.hpp"
 #include "../Config.hpp"
+#include <TScript.hpp>
 #include <TProfile.hpp>
 #include <GearSets.hpp>
 #include <Food.hpp>
-#include <Game/Interfaces/Mainscreen.hpp>
-#include <Game/Interfaces/Bank.hpp>
-#include <Game/Interfaces/GameTabs/Inventory.hpp>
+#include <Game/Core.hpp>
 #include <Utilities/Bank.hpp>
 #include <Utilities/Inventory.hpp>
-#include <Game/Interfaces/GameTabs/Equipment.hpp>
-#include <TScript.hpp>
+#include <Utilities/Containers.hpp>
+#include <Utilities/Antiban.hpp>
 
 namespace Banking
 {
@@ -30,104 +29,137 @@ namespace Banking
 }
 
 
-bool Banking::Withdraw(const Supplies::SUPPLY_ITEMS_SNAPSHOT& Snapshot)
+bool Banking::Withdraw(Supplies::Snapshot& Snapshot)
 {
     static const auto AnglerfishID = Food::GetItemID(Food::ANGLERFISH);
 
-    enum INVENTORY_SETUP
+    // - move to Supplies
+    // - Withdraw if it isn't in inventory
+    // - recharge blowpipe
+    // - Organize items - should also move anglerfish - have this be an optional skip - so withdrawing won't require gear items to be in the right spot
+    // - Withdraw Anglerfish recharge blowpipe
+    // - Organize items - force, and double check as it's required to withdraw the rest
+    // - recharge blowpipe
+
+/*        std::vector<std::int32_t> SwapItemIDs;
+        std::vector<OSRSBox::Items::Item> SwapItems = Snapshot.MeleeSet_Equipped ? SwapMeleeItems : SwapRangedItems;
+        std::for_each(SwapItems.begin(), SwapItems.end(), [&](const OSRSBox::Items::Item& I) { return SwapItemIDs.emplace_back(I.id); });
+        std::vector<std::int32_t> SwapItemIDsAndAnglerfish = SwapItemIDs;
+        SwapItemIDsAndAnglerfish.emplace_back(AnglerfishID);*/
+
+/*    static const auto SwapSlots = SlotSet(std::set<uint32_t> { 0, 4, 8, 12 });
+    static const auto DivineSlots = SlotSet(std::set<uint32_t> { 1, 2 });
+    static const auto RestoreSlots = SlotSet(std::set<uint32_t> { 3, 5, 6, 7, 8, 9, 10 });*/
+
+    return false;
+}
+
+bool Banking::Open(const Tile& Override)
+{
+    static auto LastPassivity = Profile::GetInt(Profile::Var_Passivity);
+    auto Passivity = Profile::GetInt(Profile::Var_Passivity);
+    if (!Antiban::Tasks.count("BANK_TABOUT") || LastPassivity != Passivity)
     {
-        SETUP_1, // https://i.imgur.com/mYCVPH7.png
-        SETUP_2, // https://i.imgur.com/AnXrwyn.png
-        SETUP_3 // https://i.imgur.com/cWfbpJL.png
+/*        Antiban::Task T;
+        LastPassivity = Passivity;
+        switch (Passivity)
+        {
+            case Profile::PASSIVITY_EXHILARATED: T = Antiban::Task(8000, 0.00, 0.08); break; // 30-45 times an hour
+            case Profile::PASSIVITY_HYPER: T = Antiban::Task(8000, 0.00, 0.05); break; // 20-30 times an hour
+            case Profile::PASSIVITY_MILD: T = Antiban::Task(8000, 0.00, 0.3); break; // 10-20 times an hour
+
+            default:
+            case Profile::PASSIVITY_MELLOW:
+            case Profile::PASSIVITY_DISINTERESTED:  T = Antiban::Task(8000, 0.00, 0.01); break; // 0-10 times an hour
+        }*/
+        Antiban::Task T = Antiban::Task(60000, 0.00, 0.35);;
+        Antiban::Tasks.insert_or_assign("BANK_TABOUT", std::move(T));
+    }
+
+    if (Bank::IsOpen()) return true;
+
+    Interactable::NPC NPC;
+    Interactable::GameObject Object;
+
+    if (!Override)
+    {
+        NPC = NPCs::Get(Globals::NPCS_BANKER, 20);
+        Object = GameObjects::Get(Globals::GAMEOBJECTS_BANKS, 20);
+    } else
+    {
+        NPC = NPCs::Get(Override);
+        Object = GameObjects::Get(Override);
+    }
+
+    if (Object && Object.GetVisibility() <= 0.25) Object = Interactable::GameObject(nullptr);
+    if (NPC && Object && Object.GetVisibility() <= 0.65) Object = Interactable::GameObject(nullptr);
+    if (NPC && Object && UniformRandom() <= 0.15 && NPC.GetVisibility() <= 0.50) Object = Interactable::GameObject(nullptr);
+    if (NPC && NPC.GetVisibility() <= 0.10) NPC = Interactable::NPC(nullptr);
+    if (!NPC && !Object)
+    {
+        DebugLog("Failed > No known bank nearby");
+        return false;
+    }
+
+    if (!Object) DebugLog("Interacting with NPC");
+    if (Object) DebugLog("Interacting with Object");
+
+    const auto DistFrom = [&Object, &NPC]() -> double
+    {
+        return Minimap::GetPosition().DistanceFrom(((bool) Object) ? Object.GetTile() : NPC.GetTile());
     };
 
-    static std::vector<int32_t> RangedGearIDs;
-    static std::vector<int32_t> MeleeGearIDs;
-
-/*    if (RangedGearIDs.empty())
+    const auto ClickBank = [&Object, &NPC]() -> bool
     {
-        for (std::uint32_t I = Equipment::HEAD; I <= Equipment::AMMO; I++)
-        {
-            if (GearSets::Sets["Melee"].Items[I].Name != "NULL" && GearSets::Sets["Ranged"].Items[I].Name != "NULL")
-            {
-                if (GearSets::Sets["Melee"].Items[I].Name != GearSets::Sets["Ranged"].Items[I].Name)
-                {
-                    MeleeGearIDs.emplace_back(GearSets::Sets["Melee"].Items[I].ID);
-                    RangedGearIDs.emplace_back(GearSets::Sets["Ranged"].Items[I].ID);
+        Script::SetStatus("Opening bank > Clicking");
+        return ((bool) Object) ? Object.Interact(std::vector<std::string> { "Bank " + Object.GetName(), "Use " + Object.GetName() }) :
+               NPC.Interact("Bank " + NPC.GetName());
+    };
 
-                    DebugLog("Melee > {}, {}", GearSets::Sets["Melee"].Items[I].Name, GearSets::Sets["Melee"].Items[I].ID);
-                    DebugLog("Ranged > {}, {}", GearSets::Sets["Ranged"].Items[I].Name, GearSets::Sets["Ranged"].Items[I].ID);
+    Script::SetStatus("Opening bank");
+    bool Clicked = ClickBank();
+
+    if (Clicked)
+    {
+        Countdown Failsafe = Countdown(16000);
+        while (Failsafe)
+        {
+            if (Terminate) return false;
+
+            if (Bank::IsOpen())
+                return true;
+
+            if (Mainscreen::IsMoving())
+            {
+                if (Antiban::RunTask("BANK_TABOUT"))
+                {
+                    Script::SetStatus("Opening bank > Tabbing out");
+                    if (UniformRandom() <= 0.75)
+                        Antiban::MouseOffClient();
+                    else
+                        Antiban::LoseClientFocus();
+                    Script::SetStatus("Opening bank > Tabbed out");
                 }
+
+                if (DistFrom() >= 4)
+                {
+                    if (UniformRandom() <= 0.15) ClickBank();
+                }
+            } else
+            {
+                Countdown C = Countdown(Antiban::GenerateDelayFromPassivity(1750, 3250, 2.2, 0.10));
+                while (C)
+                {
+                    if (Terminate) return false;
+                    if (Bank::IsOpen()) return true;
+                    if (Mainscreen::IsMoving()) break;
+                    Wait(100);
+                }
+
+                if (C.IsFinished())
+                    return false;
             }
-        }
-    }*/
-
-    static auto PlayerPreference = Profile::GeneratePlayerUnique(GameListener::GetLocalPlayerName(), "InventorySetup", SETUP_1, SETUP_3);
-
-    while (true)
-    {
-        if (!Snapshot.NonSupplyItems_Inv.empty()) return false;
-        const auto InventoryContainer = Inventory::GetContainerItems();
-
-
-
-
-        switch (PlayerPreference)
-        {
-            case SETUP_1:
-            {
-                static const auto SwapSlots = SlotSet(std::set<uint32_t> { 0, 5, 9, 13 });
-                static const auto DivineSlots = SlotSet(std::set<uint32_t> { 1, 2 });
-                static const auto RestoreSlots = SlotSet(std::set<uint32_t> { 4, 6, 7, 8, 10, 11, 12 });
-
-                if (Snapshot.MeleeSet_Equipped)
-                {
-                    static std::vector<int32_t> GearIDs;
-/*                    if (GearIDs.empty())
-                    {
-                        for (std::uint32_t I = Equipment::HEAD; I <= Equipment::AMMO; I++)
-                        {
-                            if (GearSets::Sets["Melee"].Items[I].Name != "NULL")
-                            {
-                                if (GearSets::Sets["Melee"].Items[I].Name != GearSets::Sets["Ranged"].Items[I].Name)
-                                    GearIDs.emplace_back(GearSets::Sets["Ranged"].Items[I].ID);
-                            }
-                        }
-                    }*/
-
-
-                } else if (Snapshot.RangedSet_Equipped)
-                {
-                    static std::vector<int32_t> GearIDs;
-/*                    if (GearIDs.empty())
-                    {
-                        for (std::uint32_t I = Equipment::HEAD; I <= Equipment::AMMO; I++)
-                        {
-                            if (GearSets::Sets["Ranged"].Items[I].Name != "NULL")
-                            {
-                                if (GearSets::Sets["Ranged"].Items[I].Name != GearSets::Sets["Melee"].Items[I].Name)
-                                    GearIDs.emplace_back(GearSets::Sets["Melee"].Items[I].ID);
-                            }
-                        }
-                    }*/
-                } else
-                {
-
-                }
-
-
-            } break;
-
-            case SETUP_2:
-            {
-
-            } break;
-
-            case SETUP_3:
-            {
-
-            } break;
-            default: break;
+            Antiban::DelayFromPassivity(175, 325, 3.0, 0.10);
         }
     }
     return false;
